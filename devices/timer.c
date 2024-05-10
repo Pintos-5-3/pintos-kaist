@@ -29,9 +29,13 @@ static bool too_many_loops(unsigned loops);
 static void busy_wait(int64_t loops);
 static void real_time_sleep(int64_t num, int32_t denom);
 
-/* Sets up the 8254 Programmable Interval Timer (PIT) to
-   interrupt PIT_FREQ times per second, and registers the
-   corresponding interrupt. */
+/**
+ * @brief 8254 프로그래머블 인터벌 타이머(PIT)를 설정하여 초당 PIT_FREQ 번 인터럽트가 발생하도록 하고, 해당 인터럽트를 등록합니다.
+ *
+ * 이 함수는 8254 PIT를 설정하여 초당 PIT_FREQ 번 인터럽트가 발생하도록 합니다. 또한, 이에 해당하는 인터럽트를 시스템에 등록합니다.
+ * 8254 PIT의 입력 주파수는 TIMER_FREQ로 나누어 가장 가까운 정수로 반올림됩니다.
+ * 이 함수는 8254 타이머 인터럽트를 처리하는 데 필요한 초기 설정을 수행합니다.
+ */
 void timer_init(void)
 {
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
@@ -42,7 +46,9 @@ void timer_init(void)
 	outb(0x40, count & 0xff);
 	outb(0x40, count >> 8);
 
-	intr_register_ext(0x20, timer_interrupt, "8254 Timer");
+	intr_register_ext(0x20, timer_interrupt, "8254 Timer"); /* 인터럽트 핸들러 등록 */
+
+	/* TODO: sleep_list 초기화 & global_tick 초기화 */
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -97,12 +103,8 @@ timer_elapsed(int64_t then)
 	return timer_ticks() - then;
 }
 
-// TODO: 주어진 timer_sleep 함수가 busy waiting을 피하도록 다시 구현하라.
 /**
  * @brief 주어진 타이머 틱 수만큼 실행을 중지합니다.
- *
- * 이 함수는 주어진 'ticks' 수만큼 타이머 틱이 경과할 때까지 실행을 중지합니다.
- * 이 기능은 'ticks' 수만큼의 타이머 틱이 경과할 때까지 현재 스레드를 양보하여 다른 스레드가 실행될 수 있도록 합니다.
  *
  * @param ticks 실행을 중지할 타이머 틱의 수.
  */
@@ -111,9 +113,22 @@ void timer_sleep(int64_t ticks)
 	int64_t start = timer_ticks();
 
 	ASSERT(intr_get_level() == INTR_ON); /* 인터럽트가 켜져 있지 않으면 assert */
-	while (timer_elapsed(start) < ticks) /* 주어진 ticks만큼 타이머 틱이 경과할 때까지 다른 쓰레드에게 CPU 양보 */
-		thread_yield();
+
+	// TODO: 주어진 timer_sleep 함수가 busy waiting을 피하도록 다시 구현하라.
+	while (timer_elapsed(start) < ticks) /* 주어진 ticks만큼 타이머 틱이 경과할 때까지 반복 */
+		thread_yield();					 /* 다른 쓰레드에게 CPU 양보 */
 }
+/**
+ * TODO:
+ *
+ * 만약, 현재 쓰레드가 idle이 아니라면
+ * 	- 호출한 쓰레드의 상태를 BLOCKED로 변경하고,
+ * 	- local tick to wake up을 저장하고,
+ * 	- 필요하다면 glocal tick을 갱신하고,
+ * 	- schedule()을 호출하라.
+ *
+ * thread list를 조작할 때, interrupt을 비활성화 합니다.
+ */
 
 /* Suspends execution for approximately MS milliseconds. */
 void timer_msleep(int64_t ms)
@@ -145,6 +160,15 @@ timer_interrupt(struct intr_frame *args UNUSED)
 {
 	ticks++;
 	thread_tick();
+
+	/**
+	 * TODO:
+	 * code to add:
+	 * 	sleep_list와 global tick을 확인한다.
+	 * 	wake up 해야할 쓰레드들을 찾으면,
+	 * 	필요시에 그 쓰레드들 ready_list로 옮기고,
+	 *  global tick을 갱신합니다.
+	 */
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
