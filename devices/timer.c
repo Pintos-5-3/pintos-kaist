@@ -24,6 +24,12 @@ static int64_t ticks;
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
 
+/* 상태가 THREAD_BLOCKED인 프로세스들의 리스트 */
+static struct list sleep_list;
+
+/* 쓰레드들의 wakeup_tick 중 최소값을 저장하는 전역변수 */
+static int64_t global_tick;
+
 static intr_handler_func timer_interrupt;
 static bool too_many_loops(unsigned loops);
 static void busy_wait(int64_t loops);
