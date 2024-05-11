@@ -328,6 +328,11 @@ void thread_yield(void)
 	intr_set_level(old_level);
 }
 
+/**
+ * @brief 현재 쓰레드를 잠재우고, 주어진 틱 시간에 깨어나도록 설정하는 함수
+ *
+ * @param wakeup_tick 쓰레드가 깨어나야 하는 시간을 나타내는 틱 값
+ */
 void thread_sleep(int64_t wakeup_tick)
 {
 	struct thread *curr = thread_current();
@@ -335,25 +340,30 @@ void thread_sleep(int64_t wakeup_tick)
 
 	ASSERT(!intr_context());
 
-	old_level = intr_disable();
+	old_level = intr_disable(); /* 인터럽트 비활성화 */
+
 	if (curr != idle_thread)
 	{
-		curr->wakeup_tick = wakeup_tick;
-		if (wakeup_tick < global_tick)
+		curr->wakeup_tick = wakeup_tick; /* local tick 설정 */
+		if (wakeup_tick < global_tick)	 /* 필요시 global_tick 갱신 */
 			set_global_tick(wakeup_tick);
-		list_push_back(&sleep_list, &curr->elem);
+		list_push_back(&sleep_list, &curr->elem); /* sleep_list에 쓰레드 삽입 */
 	}
-	do_schedule(THREAD_BLOCKED);
-	intr_set_level(old_level);
+	do_schedule(THREAD_BLOCKED); /* 현재 쓰레드를 blocked 상태로 스케줄링 */
+	intr_set_level(old_level);	 /* 이전 인터럽트 복원 */
 }
 
-/* TODO: wakeup 구현 */
+/**
+ * @brief 주어진 틱 시간에 깨어날 쓰레드를 깨우는 함수
+ *
+ * @param curr_tick 현재 시간을 나타내는 틱 값
+ */
 void thread_wakeup(int64_t curr_tick)
 {
-	if (global_tick > curr_tick)
+	if (global_tick > curr_tick) /* 현재 tick이 global tick보다 작은 경우 함수 종료 */
 		return;
 
-	if (list_empty(&sleep_list))
+	if (list_empty(&sleep_list)) /* sleep_list가 비어있는 경우 함수 종료 */
 		return;
 
 	struct list_elem *e;
@@ -361,11 +371,11 @@ void thread_wakeup(int64_t curr_tick)
 	enum intr_level old_level;
 
 	e = list_begin(&sleep_list);
-	while (e != list_end(&sleep_list))
+	while (e != list_end(&sleep_list)) /* sleep_list를 순회하며 깨어날 쓰레드 처리 */
 	{
 		t = list_entry(e, struct thread, elem); /* 해당 elem와 매핑된 thread */
 
-		if (t->wakeup_tick <= curr_tick)
+		if (t->wakeup_tick <= curr_tick) /* wakeup 필요 */
 		{
 			e = list_remove(e);				 /* sleep_list에서 제거 */
 			thread_unblock(t);				 /* 쓰레드 block 해제 후 */

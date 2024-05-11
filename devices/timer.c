@@ -109,8 +109,7 @@ timer_elapsed(int64_t then)
 void timer_sleep(int64_t ticks)
 {
 	ASSERT(intr_get_level() == INTR_ON); /* 인터럽트가 켜져 있지 않으면 assert */
-
-	thread_sleep(timer_ticks() + ticks);
+	thread_sleep(timer_ticks() + ticks); /* 현재 쓰레드를 일정 tick만큼 sleep 시키는 함수 호출 */
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -138,13 +137,19 @@ void timer_print_stats(void)
 }
 
 /* Timer interrupt handler. */
+
+/**
+ * @brief 타이머 인터럽트 핸들러
+ *
+ * @param UNUSED 인터럽트 프레임 (현재 사용되지 않음)
+ */
 static void
 timer_interrupt(struct intr_frame *args UNUSED)
 {
 	ticks++;
 	thread_tick();
 
-	thread_wakeup(ticks);
+	thread_wakeup(ticks); /* 지정된 틱 시간에 깨어날 스레드를 깨우는 함수 호출 */
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
