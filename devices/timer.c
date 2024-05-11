@@ -24,12 +24,6 @@ static int64_t ticks;
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
 
-/* 상태가 THREAD_BLOCKED인 프로세스들의 리스트 */
-static struct list sleep_list;
-
-/* 쓰레드들의 wakeup_tick 중 최소값을 저장하는 전역변수 */
-static int64_t global_tick;
-
 static intr_handler_func timer_interrupt;
 static bool too_many_loops(unsigned loops);
 static void busy_wait(int64_t loops);
@@ -53,8 +47,6 @@ void timer_init(void)
 	outb(0x40, count >> 8);
 
 	intr_register_ext(0x20, timer_interrupt, "8254 Timer"); /* 인터럽트 핸들러 등록 */
-
-	/* TODO: sleep_list 초기화 & global_tick 초기화 */
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -116,25 +108,10 @@ timer_elapsed(int64_t then)
  */
 void timer_sleep(int64_t ticks)
 {
-	int64_t start = timer_ticks();
-
 	ASSERT(intr_get_level() == INTR_ON); /* 인터럽트가 켜져 있지 않으면 assert */
 
-	// TODO: 주어진 timer_sleep 함수가 busy waiting을 피하도록 다시 구현하라.
-	while (timer_elapsed(start) < ticks) /* 주어진 ticks만큼 타이머 틱이 경과할 때까지 반복 */
-		thread_yield();					 /* 다른 쓰레드에게 CPU 양보 */
+	thread_sleep(timer_ticks() + ticks);
 }
-/**
- * TODO:
- *
- * 만약, 현재 쓰레드가 idle이 아니라면
- * 	- 호출한 쓰레드의 상태를 BLOCKED로 변경하고,
- * 	- local tick to wake up을 저장하고,
- * 	- 필요하다면 glocal tick을 갱신하고,
- * 	- schedule()을 호출하라.
- *
- * thread list를 조작할 때, interrupt을 비활성화 합니다.
- */
 
 /* Suspends execution for approximately MS milliseconds. */
 void timer_msleep(int64_t ms)
@@ -167,14 +144,7 @@ timer_interrupt(struct intr_frame *args UNUSED)
 	ticks++;
 	thread_tick();
 
-	/**
-	 * TODO:
-	 * code to add:
-	 * 	sleep_list와 global tick을 확인한다.
-	 * 	wake up 해야할 쓰레드들을 찾으면,
-	 * 	필요시에 그 쓰레드들 ready_list로 옮기고,
-	 *  global tick을 갱신합니다.
-	 */
+	thread_wakeup(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
