@@ -694,6 +694,15 @@ static int set_global_tick(int64_t tick)
 	return 1;
 }
 
+/**
+ * @brief 두 쓰레드의 깨어날 시간을 비교하는 함수
+ *
+ * @param a_ 첫 번째 쓰레드의 리스트 요소
+ * @param b_ 두 번째 쓰레드의 리스트 요소
+ * @param UNUSED 사용되지 않는 매개변수
+ * @return true 첫 번째 쓰레드의 깨어날 시간이 두 번째 쓰레드의 깨어날 시간보다 이전인 경우
+ * @return false 그렇지 않은 경우
+ */
 static bool wakeup_less(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
 {
 	const struct thread *a = list_entry(a_, struct thread, elem);
