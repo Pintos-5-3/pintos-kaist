@@ -322,6 +322,53 @@ void thread_yield(void)
 	intr_set_level(old_level);
 }
 
+void thread_sleep(int64_t wakeup_tick)
+{
+	struct thread *curr = thread_current();
+	enum intr_level old_level;
+
+	ASSERT(!intr_context());
+
+	if (curr != idle_thread)
+	{
+
+		curr->wakeup_tick = wakeup_tick;
+		if (wakeup_tick < global_tick)
+			set_global_tick(wakeup_tick);
+		thread_block();
+		list_push_back(&sleep_list, &curr->elem);
+	}
+}
+
+/* TODO: wakeup 구현 */
+void thread_wakeup(int64_t curr_tick)
+{
+	if (global_tick > curr_tick)
+		return;
+
+	if (list_empty(&sleep_list))
+		return;
+
+	struct list_elem *e;
+	struct thread *t;
+	enum intr_level old_level;
+
+	ASSERT(!intr_context());
+
+	for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = e->next)
+	{
+		t = list_entry(e, struct thread, elem); /* 해당 elem와 매핑된 thread */
+
+		if (t->wakeup_tick == curr_tick)
+		{
+
+			list_remove(e);					 /* sleep_list에서 제거 */
+			thread_unblock(t);				 /* 쓰레드 block 해제 후 */
+			set_global_tick(get_min_tick()); /* global_tick 갱신 */
+		}
+	}
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
@@ -611,4 +658,29 @@ allocate_tid(void)
 	lock_release(&tid_lock);
 
 	return tid;
+}
+
+int64_t get_min_tick()
+{
+	if (list_empty(&sleep_list))
+		return INT64_MAX;
+	return list_min(&sleep_list, wakeup_less, NULL);
+}
+
+int set_global_tick(int64_t tick)
+{
+	if (global_tick <= tick) /* 입력받은 tick이 global_tick보다 크면 예외처리 */
+		return 0;
+
+	/* global_tick 갱신 */
+	global_tick = tick;
+	return 1;
+}
+
+static bool wakeup_less(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+{
+	const struct thread *a = list_entry(a_, struct thread, elem);
+	const struct thread *b = list_entry(b_, struct thread, elem);
+
+	return a->wakeup_tick < b->wakeup_tick;
 }
