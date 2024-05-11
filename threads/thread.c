@@ -28,6 +28,12 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* 상태가 THREAD_BLOCKED인 프로세스들의 리스트 */
+static struct list sleep_list;
+
+/* 쓰레드들의 wakeup_tick 중 최소값을 저장하는 전역변수 */
+static int64_t global_tick;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -106,7 +112,10 @@ void thread_init(void)
 	/* Init the globla thread context */
 	lock_init(&tid_lock);
 	list_init(&ready_list);
+	list_init(&sleep_list); /* sleep list 초기화 */
 	list_init(&destruction_req);
+
+	global_tick = INT64_MAX; /* global tick 초기화 */
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread();
