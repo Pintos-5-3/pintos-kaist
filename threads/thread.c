@@ -90,8 +90,6 @@ static uint64_t gdt[3] = {0,
 						  0x00af9a000000ffff,
 						  0x00cf92000000ffff};
 
-static cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
-
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -748,7 +746,7 @@ static bool wakeup_less(const struct list_elem *a_, const struct list_elem *b_, 
 /* NOTE: priority-insert-ordered
 - priority 비교 함수 구현
 */
-static cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+bool cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
 {
 	const struct thread *a = list_entry(a_, struct thread, elem);
 	const struct thread *b = list_entry(b_, struct thread, elem);
