@@ -220,6 +220,10 @@ tid_t thread_create(const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock(t);
 
+	/* TODO: priority-insert-ordered
+	- current 쓰레드와 새롭게 생성된 쓰레드의 우선순위 비교하여, 필요 시 yield
+	*/
+
 	return tid;
 }
 
@@ -253,6 +257,9 @@ void thread_unblock(struct thread *t)
 
 	old_level = intr_disable();
 	ASSERT(t->status == THREAD_BLOCKED);
+	/* TODO: priority-insert-ordered
+	- ready_list에 우선순위 순으로 삽입
+	*/
 	list_push_back(&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level(old_level);
@@ -322,6 +329,10 @@ void thread_yield(void)
 	ASSERT(!intr_context());
 
 	old_level = intr_disable();
+
+	/* TODO: priority-insert-ordered
+	- ready_list에 우선순위 순으로 삽입
+	*/
 	if (curr != idle_thread)
 		list_push_back(&ready_list, &curr->elem);
 	do_schedule(THREAD_READY);
@@ -389,6 +400,9 @@ void thread_wakeup(int64_t curr_tick)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
+	/* TODO: priority-insert-ordered
+	- Reorder the ready_list
+	 */
 	thread_current()->priority = new_priority;
 }
 
@@ -709,4 +723,15 @@ static bool wakeup_less(const struct list_elem *a_, const struct list_elem *b_, 
 	const struct thread *b = list_entry(b_, struct thread, elem);
 
 	return a->wakeup_tick < b->wakeup_tick;
+}
+
+/* NOTE: priority-insert-ordered
+- priority 비교 함수 구현
+*/
+static cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+{
+	const struct thread *a = list_entry(a_, struct thread, elem);
+	const struct thread *b = list_entry(b_, struct thread, elem);
+
+	return a->priority > b->priority;
 }
