@@ -90,6 +90,8 @@ static uint64_t gdt[3] = {0,
 						  0x00af9a000000ffff,
 						  0x00cf92000000ffff};
 
+static cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -220,9 +222,11 @@ tid_t thread_create(const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock(t);
 
-	/* TODO: priority-insert-ordered
-	- current 쓰레드와 새롭게 생성된 쓰레드의 우선순위 비교하여, 필요 시 yield
-	*/
+	/**
+	 * NOTE: current 쓰레드와 새롭게 생성된 쓰레드의 우선순위 비교하여, 필요 시 yield
+	 * part: priority-insert-ordered
+	 */
+	thread_compare_yield(t);
 
 	return tid;
 }
@@ -257,10 +261,12 @@ void thread_unblock(struct thread *t)
 
 	old_level = intr_disable();
 	ASSERT(t->status == THREAD_BLOCKED);
-	/* TODO: priority-insert-ordered
-	- ready_list에 우선순위 순으로 삽입
-	*/
-	list_push_back(&ready_list, &t->elem);
+
+	/**
+	 * NOTE: ready_list에 우선순위 순으로 삽입
+	 * part: priority-insert-ordered
+	 */
+	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level(old_level);
 }
@@ -314,6 +320,12 @@ void thread_exit(void)
 	NOT_REACHED();
 }
 
+void thread_compare_yield(struct thread *t)
+{
+	if (thread_current()->priority < t->priority)
+		thread_yield();
+}
+
 /**
  * @brief CPU를 다른 쓰레드에게 양보하는 함수
  *
@@ -330,11 +342,12 @@ void thread_yield(void)
 
 	old_level = intr_disable();
 
-	/* TODO: priority-insert-ordered
-	- ready_list에 우선순위 순으로 삽입
-	*/
+	/**
+	 * NOTE: ready_list에 우선순위 순으로 삽입
+	 * part: priority-insert-ordered
+	 */
 	if (curr != idle_thread)
-		list_push_back(&ready_list, &curr->elem);
+		list_insert_ordered(&ready_list, &curr->elem, cmp_priority, NULL);
 	do_schedule(THREAD_READY);
 	intr_set_level(old_level);
 }
