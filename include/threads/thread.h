@@ -97,6 +97,8 @@ struct thread
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
 
+	/* TODO: donation을 위한 정보 추가 - donations, d_elem, wait_on_lock */
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */

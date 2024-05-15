@@ -205,6 +205,7 @@ void lock_acquire(struct lock *lock)
 	ASSERT(!intr_context());
 	ASSERT(!lock_held_by_current_thread(lock));
 
+	/* TODO: lock을 사용할 수 없는 경우 우선순위 상속 */
 	sema_down(&lock->semaphore);
 	lock->holder = thread_current();
 }
@@ -238,7 +239,7 @@ void lock_release(struct lock *lock)
 {
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
-
+	/* TODO: lock 해제 시 원상복구 */
 	lock->holder = NULL;
 	sema_up(&lock->semaphore);
 }

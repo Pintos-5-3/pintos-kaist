@@ -318,6 +318,10 @@ void thread_exit(void)
 	NOT_REACHED();
 }
 
+/**
+ * @brief 현재 실행 중인 쓰레드의 우선순위와 ready list의 첫 번째 쓰레드의 우선순위를 비교하여, 필요한 경우 쓰레드를 양보하는 함수
+ *
+ */
 void thread_preempt()
 {
 	if (list_empty(&ready_list))
@@ -415,6 +419,8 @@ void thread_wakeup(int64_t curr_tick)
 void thread_set_priority(int new_priority)
 {
 	thread_current()->priority = new_priority;
+
+	/* TODO: donation을 고려하여 우선순위 설정 */
 
 	/**
 	 * NOTE: Reorder the ready_list
@@ -525,6 +531,8 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	/* TODO: donation을 위한 정보 초기화 - donations, d_elem, wait_on_lock */
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
