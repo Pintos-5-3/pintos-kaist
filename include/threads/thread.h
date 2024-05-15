@@ -97,7 +97,11 @@ struct thread
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
 
-	/* TODO: donation을 위한 정보 추가 - donations, d_elem, wait_on_lock */
+	/* NOTE: Priority donation을 위한 데이터 */
+	int origin_priority;	   /* Priority donation 받기 전 원래의 쓰레드 우선순위 */
+	struct list donations;	   /* 이 쓰레드에게 우선순위를 기부한 쓰레드들의 리스트 */
+	struct list_elem d_elem;   /* Donations list element */
+	struct lock *wait_on_lock; /* 이 쓰레드가 현재 대기 중인 락 */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
