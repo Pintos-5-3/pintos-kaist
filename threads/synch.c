@@ -424,3 +424,17 @@ void donation(struct thread *t)
 	if (t->wait_on_lock)
 		donation(t->wait_on_lock->holder);
 }
+
+/**
+ * @brief 주어진 리스트 요소가 특정 lock을 대기하고 있는 중인지 확인하는 함수
+ *
+ * @param e 검사할 리스트 요소. 이 요소는 쓰레드로 변환된다.
+ * @param lock 쓰레드가 대기하고 있는지 확인할 락.
+ * @return true 해당 쓰레드가 주어진 락을 대기하고 있는 경우 true 반환
+ * @return false 그렇지 않은 경우 false 반환
+ */
+static bool is_waiter(struct list_elem *e, struct lock *lock)
+{
+	struct thread *t = list_entry(e, struct thread, d_elem);
+	return t->wait_on_lock == lock;
+}
