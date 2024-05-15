@@ -205,9 +205,19 @@ void lock_acquire(struct lock *lock)
 	ASSERT(!intr_context());
 	ASSERT(!lock_held_by_current_thread(lock));
 
-	/* TODO: lock을 사용할 수 없는 경우 우선순위 상속 */
-	sema_down(&lock->semaphore);
-	lock->holder = thread_current();
+	/* NOTE: lock을 사용할 수 없는 경우 우선순위 상속 */
+	if (!lock_try_acquire(lock))
+	{
+		thread_current()->wait_on_lock = lock;
+		list_insert_ordered(&lock->holder->donations, &thread_current()->d_elem, cmp_priority_donation, NULL);
+		donation(lock->holder);
+
+		sema_down(&lock->semaphore);
+		lock->holder = thread_current();
+	}
+
+	/* 할당 완료 시 wait_on_lock NULL로 초기화 */
+	lock->holder->wait_on_lock = NULL;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
