@@ -373,3 +373,27 @@ static bool cmp_priority_by_sema(const struct list_elem *a_, const struct list_e
 	else
 		return false;
 }
+
+/**
+ * @brief 우선순위를 기부받고, 필요한 경우 우선순위 기부를 재귀적으로 수행하는 함수
+ *
+ * @param t
+ */
+void donation(struct thread *t)
+{
+	ASSERT(t != NULL);
+
+	/* 리스트가 비어있는 경우 - 원래의 우선순위로 복구 */
+	if (list_empty(&t->donations))
+		t->priority = t->origin_priority;
+	/* 그렇지 않은 경우 - donations 중 우선순위가 가장 높은 쓰레드에게 우선순위 기부 받기 */
+	else
+	{
+		struct thread *highest = list_entry(list_front(&t->donations), struct thread, d_elem);
+		t->priority = highest->priority;
+	}
+
+	/* 현재 쓰레드가 락을 기다리고 있는 경우, 락의 소유자에게 재귀적으로 우선순위 기부 */
+	if (t->wait_on_lock)
+		donation(t->wait_on_lock->holder);
+}
