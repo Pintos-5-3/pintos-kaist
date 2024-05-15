@@ -419,8 +419,7 @@ void thread_wakeup(int64_t curr_tick)
 void thread_set_priority(int new_priority)
 {
 	thread_current()->priority = new_priority;
-
-	/* TODO: donation을 고려하여 우선순위 설정 */
+	thread_current()->origin_priority = new_priority; /* NOTE: origin_priority 설정 */
 
 	/**
 	 * NOTE: Reorder the ready_list
