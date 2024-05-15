@@ -352,6 +352,23 @@ void cond_broadcast(struct condition *cond, struct lock *lock)
 }
 
 /**
+ * @brief 두 쓰레드의 우선순위를 비교하는 함수
+ *
+ * @param a_ 첫 번째 리스트 요소
+ * @param b_ 두 번째 리스트 요소
+ * @param UNUSED 사용하지 않는 매개변수
+ * @return true 첫 번째 쓰레드의 우선순위가 두 번째 쓰레드보다 높은 경우 true 반환
+ * @return false 그렇지 않은 경우 false 반환
+ */
+static bool cmp_priority_donation(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+{
+	struct thread *a = list_entry(a_, struct thread, d_elem);
+	struct thread *b = list_entry(b_, struct thread, d_elem);
+
+	return a->priority > b->priority;
+}
+
+/**
  * @brief 두 세마포어의 우선순위를 비교하는 함수
  *
  * @param a_ 첫 번째 리스트 요소
