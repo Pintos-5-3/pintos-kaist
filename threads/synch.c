@@ -32,6 +32,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+static bool cmp_priority_by_sema(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -67,10 +69,10 @@ void sema_down(struct semaphore *sema)
 	while (sema->value == 0)
 	{
 		/**
-		 * TODO: 우선순위 순으로 waiters에 삽입
+		 * NOTE: 우선순위 순으로 waiters에 삽입
 		 * part: priority-sync
 		 */
-		list_push_back(&sema->waiters, &thread_current()->elem);
+		list_insert_ordered(&sema->waiters, &thread_current()->elem, cmp_priority, NULL);
 		thread_block();
 	}
 	sema->value--;
@@ -113,14 +115,20 @@ void sema_up(struct semaphore *sema)
 	ASSERT(sema != NULL);
 
 	old_level = intr_disable();
-	/**
-	 * TODO: waiters 정렬
-	 * part: priority-sync
-	 */
+
 	if (!list_empty(&sema->waiters))
+	{
+		/**
+		 * NOTE: waiters 정렬
+		 * part: priority-sync
+		 */
+		list_sort(&sema->waiters, cmp_priority, NULL);
 		thread_unblock(list_entry(list_pop_front(&sema->waiters),
 								  struct thread, elem));
+	}
+
 	sema->value++;
+	thread_preempt();
 	intr_set_level(old_level);
 }
 
@@ -253,7 +261,7 @@ struct semaphore_elem
 };
 
 /* Initializes condition variable COND.  A condition variable
-   allows one piece of code to signal a condition and cooperating
+   allows one piece of  code to signal a condition and cooperating
    code to receive the signal and act upon it. */
 void cond_init(struct condition *cond)
 {
@@ -339,4 +347,12 @@ void cond_broadcast(struct condition *cond, struct lock *lock)
 
 	while (!list_empty(&cond->waiters))
 		cond_signal(cond, lock);
+}
+
+static bool cmp_priority_by_sema(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
+{
+	struct semaphore_elem *a_sema = list_entry(a_, struct semaphore_elem, elem);
+	struct semaphore_elem *b_sema = list_entry(b_, struct semaphore_elem, elem);
+
+	cmp_priority(list_front(&a_sema->semaphore.waiters), list_front(&b_sema->semaphore.waiters), NULL);
 }
