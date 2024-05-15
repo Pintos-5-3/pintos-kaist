@@ -357,8 +357,8 @@ void cond_broadcast(struct condition *cond, struct lock *lock)
  * @param a_ 첫 번째 리스트 요소
  * @param b_ 두 번째 리스트 요소
  * @param UNUSED 사용하지 않는 매개변수
- * @return true 첫 번째 세마포어의 우선순위가 두 번째 세마포어보다 높거나 같은 경우
- * @return false 첫 번째 세마포어의 우선순위가 두 번째 세마포어보다 낮은 경우
+ * @return true 첫 번째 세마포어의 우선순위가 두 번째 세마포어보다 높은 경우 true 반환
+ * @return false 그렇지 않은 경우 false 반환
  */
 static bool cmp_priority_by_sema(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
 {
@@ -377,7 +377,7 @@ static bool cmp_priority_by_sema(const struct list_elem *a_, const struct list_e
 /**
  * @brief 우선순위를 기부받고, 필요한 경우 우선순위 기부를 재귀적으로 수행하는 함수
  *
- * @param t
+ * @param t 우선순위를 기부받을 쓰레드
  */
 void donation(struct thread *t)
 {
