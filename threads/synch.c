@@ -32,7 +32,10 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+static bool cmp_priority_donation(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 static bool cmp_priority_by_sema(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+static void priority_donation(struct thread *t);
+static bool is_waiter(struct list_elem *e, struct lock *lock);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -438,7 +441,7 @@ static void priority_donation(struct thread *t)
 
 	/* 현재 쓰레드가 락을 기다리고 있는 경우, 락의 소유자에게 재귀적으로 우선순위 기부 */
 	if (t->wait_on_lock)
-		donation(t->wait_on_lock->holder);
+		priority_donation(t->wait_on_lock->holder);
 }
 
 /**
