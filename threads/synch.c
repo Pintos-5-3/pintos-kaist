@@ -301,10 +301,10 @@ void cond_wait(struct condition *cond, struct lock *lock)
 
 	sema_init(&waiter.semaphore, 0);
 	/**
-	 * TODO: 우선순위 순으로 waiters에 삽입
+	 * NOTE: 우선순위 순으로 waiters에 삽입
 	 * part: priority-sync
 	 */
-	list_push_back(&cond->waiters, &waiter.elem);
+	list_insert_ordered(&cond->waiters, &waiter.elem, cmp_priority_by_sema, NULL);
 	lock_release(lock);
 	sema_down(&waiter.semaphore);
 	lock_acquire(lock);
@@ -325,9 +325,10 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
 	ASSERT(lock_held_by_current_thread(lock));
 
 	/**
-	 * TODO: waiters 정렬
+	 * NOTE: waiters 정렬
 	 * part: priority-sync
 	 */
+	list_sort(&cond->waiters, cmp_priority_by_sema, NULL);
 	if (!list_empty(&cond->waiters))
 		sema_up(&list_entry(list_pop_front(&cond->waiters),
 							struct semaphore_elem, elem)
@@ -349,10 +350,25 @@ void cond_broadcast(struct condition *cond, struct lock *lock)
 		cond_signal(cond, lock);
 }
 
+/**
+ * @brief 두 세마포어의 우선순위를 비교하는 함수
+ *
+ * @param a_ 첫 번째 리스트 요소
+ * @param b_ 두 번째 리스트 요소
+ * @param UNUSED 사용하지 않는 매개변수
+ * @return true 첫 번째 세마포어의 우선순위가 두 번째 세마포어보다 높거나 같은 경우
+ * @return false 첫 번째 세마포어의 우선순위가 두 번째 세마포어보다 낮은 경우
+ */
 static bool cmp_priority_by_sema(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
 {
 	struct semaphore_elem *a_sema = list_entry(a_, struct semaphore_elem, elem);
 	struct semaphore_elem *b_sema = list_entry(b_, struct semaphore_elem, elem);
 
-	cmp_priority(list_front(&a_sema->semaphore.waiters), list_front(&b_sema->semaphore.waiters), NULL);
+	/* semaphore.waiters 리스트가 빈 리스트인 경우 예외처리 */
+	if (!list_empty(&a_sema->semaphore.waiters) && !list_empty(&b_sema->semaphore.waiters))
+	{
+		cmp_priority(list_front(&a_sema->semaphore.waiters), list_front(&b_sema->semaphore.waiters), NULL);
+	}
+	else
+		return false;
 }
