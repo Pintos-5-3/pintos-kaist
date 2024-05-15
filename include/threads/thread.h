@@ -133,7 +133,7 @@ tid_t thread_tid(void);
 const char *thread_name(void);
 
 void thread_exit(void) NO_RETURN;
-void thread_compare_yield(struct thread *t);
+void thread_preempt();
 void thread_yield(void);
 void thread_sleep(int64_t wakeup_tick);
 void thread_wakeup(int64_t curr_tick);

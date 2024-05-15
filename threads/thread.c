@@ -224,7 +224,7 @@ tid_t thread_create(const char *name, int priority,
 	 * NOTE: current 쓰레드와 새롭게 생성된 쓰레드의 우선순위 비교하여, 필요 시 yield
 	 * part: priority-insert-ordered
 	 */
-	thread_compare_yield(t);
+	thread_preempt();
 
 	return tid;
 }
@@ -318,8 +318,12 @@ void thread_exit(void)
 	NOT_REACHED();
 }
 
-void thread_compare_yield(struct thread *t)
+void thread_preempt()
 {
+	if (list_empty(&ready_list))
+		return;
+
+	struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
 	if (thread_current()->priority < t->priority)
 		thread_yield();
 }
@@ -390,7 +394,6 @@ void thread_wakeup(int64_t curr_tick)
 
 	struct list_elem *e;
 	struct thread *t;
-	enum intr_level old_level;
 
 	e = list_begin(&sleep_list);
 	while (e != list_end(&sleep_list)) /* sleep_list를 순회하며 깨어날 쓰레드 처리 */
@@ -399,13 +402,13 @@ void thread_wakeup(int64_t curr_tick)
 
 		if (t->wakeup_tick <= curr_tick) /* wakeup 필요 */
 		{
-			e = list_remove(e);				 /* sleep_list에서 제거 */
-			thread_unblock(t);				 /* 쓰레드 block 해제 후 */
-			set_global_tick(get_min_tick()); /* global_tick 갱신 */
+			e = list_remove(e); /* sleep_list에서 제거 */
+			thread_unblock(t);	/* 쓰레드 block 해제 후 */
 		}
 		else
 			e = e->next;
 	}
+	set_global_tick(get_min_tick()); /* global_tick 갱신 */
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -420,7 +423,7 @@ void thread_set_priority(int new_priority)
 	if (!list_empty(&ready_list))
 	{
 		struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
-		thread_compare_yield(t);
+		thread_preempt(t);
 	}
 }
 
