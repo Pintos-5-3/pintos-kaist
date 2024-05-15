@@ -1,3 +1,16 @@
+# Ignore all
+*
+
+# Unignore all with extensions
+!*.*
+
+# Unignore all dirs
+!*/
+
+**/build/*
+
+### Above combination will ignore all files without extension ###
+
 # Prerequisites
 *.d
 
@@ -50,3 +63,5 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+
