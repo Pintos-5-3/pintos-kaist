@@ -532,7 +532,9 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
-	/* TODO: donation을 위한 정보 초기화 - donations, d_elem, wait_on_lock */
+	/* NOTE: donation을 위한 데이터 초기화 */
+	list_init(&t->donations);
+	t->origin_priority = priority;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
