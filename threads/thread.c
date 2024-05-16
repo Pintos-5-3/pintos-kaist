@@ -73,7 +73,7 @@ static void do_schedule(int status);
 static void schedule(void);
 static tid_t allocate_tid(void);
 
-static int64_t get_min_tick();
+static int64_t get_min_tick(void);
 static int set_global_tick(int64_t tick);
 static bool wakeup_less(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
@@ -423,24 +423,19 @@ void thread_wakeup(int64_t curr_tick)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
-	/* NOTE: [Part3] MLFQ 사용 시 priority setting 사용되지 않음 */
-	if (thread_mlfqs)
-		return;
-
-	/* NOTE: donation 고려하여 우선순위 설정 */
-	if (thread_current()->origin_priority == thread_current()->priority)
-		thread_current()->priority = new_priority;
-	thread_current()->origin_priority = new_priority;
+	if (!thread_mlfqs)
+	{
+		/* NOTE: donation 고려하여 우선순위 설정 */
+		if (thread_current()->origin_priority == thread_current()->priority)
+			thread_current()->priority = new_priority;
+		thread_current()->origin_priority = new_priority;
+	}
 
 	/**
 	 * NOTE: Reorder the ready_list
 	 * part: priority-insert-ordered
 	 */
-	if (!list_empty(&ready_list))
-	{
-		struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
-		thread_preempt();
-	}
+	thread_preempt();
 }
 
 /* Returns the current thread's priority. */
@@ -450,30 +445,48 @@ int thread_get_priority(void)
 }
 
 /* Sets the current thread's nice value to NICE. */
-void thread_set_nice(int nice UNUSED)
+/** NOTE: [Part3]
+ * @brief
+ *
+ * @return int
+ */
+void thread_set_nice(int new_nice)
 {
-	/* TODO: Your implementation goes here */
+	if (thread_current() != idle_thread)
+		thread_current()->nice = new_nice;
 }
 
 /* Returns the current thread's nice value. */
+/** NOTE: [Part3]
+ * @brief
+ *
+ * @return int
+ */
 int thread_get_nice(void)
 {
-	/* TODO: Your implementation goes here */
-	return 0;
+	return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
+/** NOTE: [Part3]
+ * @brief
+ *
+ * @return int
+ */
 int thread_get_load_avg(void)
 {
-	/* TODO: Your implementation goes here */
-	return 0;
+	return fp_to_int_round_near(load_avg) * 100;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
+/** NOTE: [Part3]
+ * @brief
+ *
+ * @return int
+ */
 int thread_get_recent_cpu(void)
 {
-	/* TODO: Your implementation goes here */
-	return 0;
+	return fp_to_int_round_near(thread_current()->recent_cpu) * 100;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -736,11 +749,11 @@ allocate_tid(void)
 	return tid;
 }
 
-static int64_t get_min_tick()
+static int64_t get_min_tick(void)
 {
 	if (list_empty(&sleep_list))
 		return INT64_MAX;
-	return list_min(&sleep_list, wakeup_less, NULL);
+	return list_entry(list_min(&sleep_list, wakeup_less, NULL), struct thread, elem)->wakeup_tick;
 }
 
 static int set_global_tick(int64_t tick)
