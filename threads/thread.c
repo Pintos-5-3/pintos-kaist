@@ -423,6 +423,10 @@ void thread_wakeup(int64_t curr_tick)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
+	/* NOTE: [Part3] MLFQ 사용 시 priority setting 사용되지 않음 */
+	if (thread_mlfqs)
+		return;
+
 	/* NOTE: donation 고려하여 우선순위 설정 */
 	if (thread_current()->origin_priority == thread_current()->priority)
 		thread_current()->priority = new_priority;
@@ -437,8 +441,6 @@ void thread_set_priority(int new_priority)
 		struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
 		thread_preempt();
 	}
-
-	/* TODO: MLFQ 사용 시 priority setting 사용되지 않음 */
 }
 
 /* Returns the current thread's priority. */

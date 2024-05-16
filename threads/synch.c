@@ -208,12 +208,17 @@ void lock_acquire(struct lock *lock)
 	ASSERT(!intr_context());
 	ASSERT(!lock_held_by_current_thread(lock));
 
-	/* NOTE: lock을 사용할 수 없는 경우 우선순위 상속 */
+	/* NOTE: [Part2-3] lock을 사용할 수 없는 경우 우선순위 상속 */
 	if (!lock_try_acquire(lock))
 	{
 		thread_current()->wait_on_lock = lock;
-		list_insert_ordered(&lock->holder->donations, &thread_current()->d_elem, cmp_priority_donation, NULL);
-		priority_donation(lock->holder);
+
+		/* NOTE: [Part3] MLFQ 사용 시 priority donation 사용 금지 */
+		if (!thread_mlfqs)
+		{
+			list_insert_ordered(&lock->holder->donations, &thread_current()->d_elem, cmp_priority_donation, NULL);
+			priority_donation(lock->holder);
+		}
 
 		sema_down(&lock->semaphore);
 		lock->holder = thread_current();
@@ -221,8 +226,6 @@ void lock_acquire(struct lock *lock)
 
 	/* 할당 완료 시 wait_on_lock NULL로 초기화 */
 	lock->holder->wait_on_lock = NULL;
-
-	/* TODO: [Part3] MLFQ 사용 시 priority donation 사용 금지 */
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -255,26 +258,28 @@ void lock_release(struct lock *lock)
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
 
-	/* NOTE: lock 해제 시 우선순위 재설정 */
-	struct list *donations = &lock->holder->donations;
-	if (!list_empty(donations))
+	/* NOTE: [Part3] MLFQ 사용 시 priority donation 사용 금지 */
+	if (!thread_mlfqs)
 	{
-		struct list_elem *e = list_front(donations);
-		while (e != list_end(donations))
+		/* NOTE: [Part2-3] lock 해제 시 우선순위 재설정 */
+		struct list *donations = &lock->holder->donations;
+		if (!list_empty(donations))
 		{
-			if (is_waiter(e, lock))
-				e = list_remove(e);
-			else
-				e = list_next(e);
+			struct list_elem *e = list_front(donations);
+			while (e != list_end(donations))
+			{
+				if (is_waiter(e, lock))
+					e = list_remove(e);
+				else
+					e = list_next(e);
+			}
 		}
+		list_sort(donations, cmp_priority_donation, NULL);
+		priority_donation(lock->holder);
 	}
-	list_sort(donations, cmp_priority_donation, NULL);
-	priority_donation(lock->holder);
 
 	lock->holder = NULL;
 	sema_up(&lock->semaphore);
-
-	/* TODO: [Part3] MLFQ 사용 시 priority donation 사용 금지 */
 }
 
 /* Returns true if the current thread holds LOCK, false
