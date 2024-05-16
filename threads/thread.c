@@ -563,7 +563,7 @@ init_thread(struct thread *t, const char *name, int priority)
 
 	/* NOTE: [Part3] MLFQ를 위한 데이터 초기화 */
 	t->nice = 0;
-	t->recent_cpu = int_to_fp(0);
+	t->recent_cpu = 0;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -800,7 +800,7 @@ bool cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *
 void thread_calc_priority(struct thread *t)
 {
 	fixed_point quarter_cpu = div_fp(t->recent_cpu, int_to_fp(4));
-	int cpu_to_priority = fp_to_int_round_near(quarter_cpu);
+	int cpu_to_priority = fp_to_int_round_zero(quarter_cpu);
 	int nice_to_priority = t->nice * 2;
 
 	t->priority = PRI_MAX - cpu_to_priority - nice_to_priority;
@@ -853,43 +853,69 @@ void thread_incr_recent_cpu()
 		curr->recent_cpu = add_fp(curr->recent_cpu, int_to_fp(1));
 }
 
-/* NOTE: [Part3] `모든` 쓰레드의 우선순위와 recent_cpu를 재계산하는 함수 구현 */
+/* NOTE: [Part3] `모든` 쓰레드의 우선순위를 재계산하는 함수 구현 */
 void thread_all_calc_priority()
 {
 	struct thread *curr = thread_current();
 	if (curr != idle_thread)
 		thread_calc_priority(curr);
 
-	if (list_empty(&ready_list))
-		return;
-
-	struct list_elem *e = list_front(&ready_list);
+	struct list_elem *e;
 	struct thread *t;
 
-	while (e != list_end(&ready_list))
+	if (!list_empty(&ready_list))
 	{
-		t = list_entry(e, struct thread, elem);
-		thread_calc_priority(t);
-		e = list_next(e);
+		e = list_front(&ready_list);
+		while (e != list_end(&ready_list))
+		{
+			t = list_entry(e, struct thread, elem);
+			thread_calc_priority(t);
+			e = list_next(e);
+		}
+	}
+
+	if (!list_empty(&sleep_list))
+	{
+		e = list_front(&sleep_list);
+		while (e != list_end(&sleep_list))
+		{
+			t = list_entry(e, struct thread, elem);
+			thread_calc_priority(t);
+			e = list_next(e);
+		}
 	}
 }
 
+/* NOTE: [Part3] `모든` 쓰레드의 recent_cpu를 재계산하는 함수 구현 */
 void thread_all_calc_recent_cpu()
 {
 	struct thread *curr = thread_current();
 	if (curr != idle_thread)
 		thread_calc_recent_cpu(curr);
 
-	if (list_empty(&ready_list))
-		return;
-
-	struct list_elem *e = list_front(&ready_list);
+	struct list_elem *e;
 	struct thread *t;
 
-	while (e != list_end(&ready_list))
+	if (!list_empty(&ready_list))
 	{
-		t = list_entry(e, struct thread, elem);
-		thread_calc_recent_cpu(t);
-		e = list_next(e);
+		e = list_front(&ready_list);
+
+		while (e != list_end(&ready_list))
+		{
+			t = list_entry(e, struct thread, elem);
+			thread_calc_recent_cpu(t);
+			e = list_next(e);
+		}
+	}
+
+	if (!list_empty(&sleep_list))
+	{
+		e = list_front(&sleep_list);
+		while (e != list_end(&sleep_list))
+		{
+			t = list_entry(e, struct thread, elem);
+			thread_calc_recent_cpu(t);
+			e = list_next(e);
+		}
 	}
 }
