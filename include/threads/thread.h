@@ -144,7 +144,7 @@ tid_t thread_tid(void);
 const char *thread_name(void);
 
 void thread_exit(void) NO_RETURN;
-void thread_preempt();
+void thread_preempt(void);
 void thread_yield(void);
 void thread_sleep(int64_t wakeup_tick);
 void thread_wakeup(int64_t curr_tick);
@@ -160,9 +160,9 @@ int thread_get_load_avg(void);
 void thread_calc_priority(struct thread *t);
 void thread_calc_recent_cpu(struct thread *t);
 void thread_incr_recent_cpu(struct thread *t);
-fixed_point calc_load_avg();
-void thread_all_calc_priority();
-void thread_all_calc_recent_cpu();
+fixed_point calc_load_avg(void);
+void thread_all_calc_priority(void);
+void thread_all_calc_recent_cpu(void);
 
 void do_iret(struct intr_frame *tf);
 bool cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
