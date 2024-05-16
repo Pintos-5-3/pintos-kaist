@@ -159,7 +159,7 @@ int thread_get_load_avg(void);
 
 void thread_calc_priority(struct thread *t);
 void thread_calc_recent_cpu(struct thread *t);
-void thread_incr_recent_cpu(struct thread *t);
+void thread_incr_recent_cpu(void);
 void calc_load_avg(void);
 void thread_all_calc_priority(void);
 void thread_all_calc_recent_cpu(void);

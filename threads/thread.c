@@ -845,9 +845,12 @@ void calc_load_avg()
 }
 
 /* NOTE: [Part3] recent_cpu를 1씩 증가시키는 함수 구현 */
-void thread_incr_recent_cpu(struct thread *t)
+void thread_incr_recent_cpu()
 {
-	t->priority = add_fp(t->recent_cpu, int_to_fp(1));
+	struct thread *curr = thread_current();
+
+	if (curr != idle_thread)
+		curr->recent_cpu = add_fp(curr->recent_cpu, int_to_fp(1));
 }
 
 /* NOTE: [Part3] `모든` 쓰레드의 우선순위와 recent_cpu를 재계산하는 함수 구현 */
