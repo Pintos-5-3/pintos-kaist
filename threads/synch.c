@@ -221,6 +221,8 @@ void lock_acquire(struct lock *lock)
 
 	/* 할당 완료 시 wait_on_lock NULL로 초기화 */
 	lock->holder->wait_on_lock = NULL;
+
+	/* TODO: [Part3] MLFQ 사용 시 priority donation 사용 금지 */
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -271,6 +273,8 @@ void lock_release(struct lock *lock)
 
 	lock->holder = NULL;
 	sema_up(&lock->semaphore);
+
+	/* TODO: [Part3] MLFQ 사용 시 priority donation 사용 금지 */
 }
 
 /* Returns true if the current thread holds LOCK, false

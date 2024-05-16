@@ -103,6 +103,8 @@ struct thread
 	struct list_elem d_elem;   /* Donations list element */
 	struct lock *wait_on_lock; /* 이 쓰레드가 현재 대기 중인 락 */
 
+	/* TODO: [Part3] MLFQ를 위한 데이터 추가 - nice, recent_cpu */
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */

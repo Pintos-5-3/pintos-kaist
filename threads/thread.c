@@ -432,6 +432,8 @@ void thread_set_priority(int new_priority)
 		struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
 		thread_preempt();
 	}
+
+	/* TODO: MLFQ 사용 시 priority setting 사용되지 않음 */
 }
 
 /* Returns the current thread's priority. */
@@ -536,6 +538,8 @@ init_thread(struct thread *t, const char *name, int priority)
 	/* NOTE: donation을 위한 데이터 초기화 */
 	list_init(&t->donations);
 	t->origin_priority = priority;
+
+	/* TODO: [Part3] MLFQ를 위한 데이터 초기화 */
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -767,3 +771,13 @@ bool cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *
 
 	return a->priority > b->priority;
 }
+
+/* TODO: [Part3] recent_cpu와 nice를 이용해 priority를 계산하는 함수 구현 */
+
+/* TODO: [Part3] recent_cpu를 계산하는 함수 구현 */
+
+/* TODO: [Part3] load_avg를 계산하는 함수 구현 */
+
+/* TODO: [Part3] recent_cpu를 1씩 증가시키는 함수 구현 */
+
+/* TODO: [Part3] `모든` 쓰레드의 우선순위와 recent_cpu를 재계산하는 함수 구현 */
