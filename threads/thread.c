@@ -824,7 +824,7 @@ void thread_calc_recent_cpu(struct thread *t)
 }
 
 /* NOTE: [Part3] load_avg를 계산하는 함수 구현 */
-fixed_point calc_load_avg()
+void calc_load_avg()
 {
 	/* 계산에 필요한 가중치 계산 */
 	fixed_point weight_59 = div_fp(int_to_fp(59), int_to_fp(60));
@@ -833,13 +833,13 @@ fixed_point calc_load_avg()
 	/* read_thread 계산: ready_list에 담긴 쓰레드의 개수 + 실행 중인 쓰레드의 개수 (idle 제외) */
 	fixed_point count_ready_threads = int_to_fp(list_size(&ready_list));
 	if (thread_current() != idle_thread)
-		add_fp(count_ready_threads, int_to_fp(1));
+		count_ready_threads = add_fp(count_ready_threads, int_to_fp(1));
 
 	/* 가중치 적용 */
 	fixed_point weighted_avg = mul_fp(weight_59, load_avg);
 	fixed_point weighted_ready_threads = mul_fp(weight_1, count_ready_threads);
 
-	return add_fp(weighted_avg, weighted_ready_threads);
+	load_avg = add_fp(weighted_avg, weighted_ready_threads);
 }
 
 /* NOTE: [Part3] recent_cpu를 1씩 증가시키는 함수 구현 */
