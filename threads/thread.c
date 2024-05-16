@@ -865,6 +865,7 @@ void thread_all_calc_priority()
 	{
 		t = list_entry(e, struct thread, elem);
 		thread_calc_priority(t);
+		e = list_next(e);
 	}
 }
 
@@ -884,5 +885,6 @@ void thread_all_calc_recent_cpu()
 	{
 		t = list_entry(e, struct thread, elem);
 		thread_calc_recent_cpu(t);
+		e = list_next(e);
 	}
 }
