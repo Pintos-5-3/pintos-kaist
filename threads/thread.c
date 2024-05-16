@@ -544,7 +544,9 @@ init_thread(struct thread *t, const char *name, int priority)
 	list_init(&t->donations);
 	t->origin_priority = priority;
 
-	/* TODO: [Part3] MLFQ를 위한 데이터 초기화 */
+	/* NOTE: [Part3] MLFQ를 위한 데이터 초기화 */
+	t->nice = 0;
+	t->recent_cpu = int_to_fp(0);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
