@@ -475,7 +475,8 @@ int thread_get_nice(void)
  */
 int thread_get_load_avg(void)
 {
-	return fp_to_int_round_near(load_avg) * 100;
+	fixed_point load_avg_100_times = mul_fp(load_avg, int_to_fp(100));
+	return fp_to_int_round_zero(load_avg_100_times);
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -486,7 +487,8 @@ int thread_get_load_avg(void)
  */
 int thread_get_recent_cpu(void)
 {
-	return fp_to_int_round_near(thread_current()->recent_cpu) * 100;
+	fixed_point recent_cpu_100_times = mul_fp(thread_current()->recent_cpu, int_to_fp(100));
+	return fp_to_int_round_zero(recent_cpu_100_times);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
