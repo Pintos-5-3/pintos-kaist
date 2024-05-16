@@ -20,6 +20,9 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
+/* NOTE: [Part3] MLFQ를 위한 tick */
+static int64_t temp_ticks;
+
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -147,12 +150,21 @@ static void
 timer_interrupt(struct intr_frame *args UNUSED)
 {
 	ticks++;
+	temp_ticks++;
 	thread_tick();
 
 	thread_wakeup(ticks); /* 지정된 틱 시간에 깨어날 스레드를 깨우는 함수 호출 */
 
-	/* TODO: [Part3] 1 sec(8 tick)마다 load_avg, recent_cpu 재계산 */
-	/* TODO: [Part3] 4 tick마다 모든 쓰레드의 우선순위 재계산 */
+	/* NOTE: [Part3] 4 tick마다 모든 쓰레드의 우선순위 재계산 */
+	if (temp_ticks == 4)
+		thread_all_calc_priority();
+	/* NOTE: [Part3] 1 sec(8 tick)마다 load_avg, recent_cpu 재계산 */
+	if (temp_ticks == 8)
+	{
+		calc_load_avg();
+		thread_all_calc_recent_cpu();
+		temp_ticks = 0;
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

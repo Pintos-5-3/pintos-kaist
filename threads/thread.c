@@ -836,14 +836,11 @@ void thread_incr_recent_cpu(struct thread *t)
 }
 
 /* NOTE: [Part3] `모든` 쓰레드의 우선순위와 recent_cpu를 재계산하는 함수 구현 */
-void recalc_all_thread()
+void thread_all_calc_priority()
 {
 	struct thread *curr = thread_current();
 	if (curr != idle_thread)
-	{
 		thread_calc_priority(curr);
-		thread_calc_recent_cpu(curr);
-	}
 
 	if (list_empty(&ready_list))
 		return;
@@ -855,6 +852,24 @@ void recalc_all_thread()
 	{
 		t = list_entry(e, struct thread, elem);
 		thread_calc_priority(t);
+	}
+}
+
+void thread_all_calc_recent_cpu()
+{
+	struct thread *curr = thread_current();
+	if (curr != idle_thread)
+		thread_calc_recent_cpu(curr);
+
+	if (list_empty(&ready_list))
+		return;
+
+	struct list_elem *e = list_front(&ready_list);
+	struct thread *t;
+
+	while (e != list_end(&ready_list))
+	{
+		t = list_entry(e, struct thread, elem);
 		thread_calc_recent_cpu(t);
 	}
 }

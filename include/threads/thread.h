@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/fixed_point.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -155,6 +156,13 @@ int thread_get_nice(void);
 void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
+
+void thread_calc_priority(struct thread *t);
+void thread_calc_recent_cpu(struct thread *t);
+void thread_incr_recent_cpu(struct thread *t);
+fixed_point calc_load_avg();
+void thread_all_calc_priority();
+void thread_all_calc_recent_cpu();
 
 void do_iret(struct intr_frame *tf);
 bool cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
