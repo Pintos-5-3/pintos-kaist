@@ -149,8 +149,6 @@ timer_interrupt(struct intr_frame *args UNUSED)
 	ticks++;
 	thread_tick();
 
-	thread_wakeup(ticks); /* 지정된 틱 시간에 깨어날 스레드를 깨우는 함수 호출 */
-
 	/**
 	 * NOTE: [Part3]
 	 * - 4 tick마다 모든 쓰레드의 우선순위 재계산
@@ -158,6 +156,8 @@ timer_interrupt(struct intr_frame *args UNUSED)
 	 */
 	if (thread_mlfqs)
 	{
+		thread_incr_recent_cpu();
+
 		if (timer_ticks() % 4 == 0)
 			thread_all_calc_priority();
 
@@ -167,6 +167,8 @@ timer_interrupt(struct intr_frame *args UNUSED)
 			thread_all_calc_recent_cpu();
 		}
 	}
+
+	thread_wakeup(ticks); /* 지정된 틱 시간에 깨어날 스레드를 깨우는 함수 호출 */
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
