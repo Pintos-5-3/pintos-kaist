@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "*.py": "python",
-        "*.css": "tailwindcss",
-        "*.c": "c",
-        "thread.h": "c",
-        "synch.h": "c"
-    }
-}
