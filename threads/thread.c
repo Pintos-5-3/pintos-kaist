@@ -444,11 +444,8 @@ int thread_get_priority(void)
 	return thread_current()->priority;
 }
 
-/* Sets the current thread's nice value to NICE. */
 /** NOTE: [Part3]
- * @brief
- *
- * @return int
+ * @brief 현재 실행 중인 쓰레드의 nice 값을 설정하는 함수
  */
 void thread_set_nice(int new_nice)
 {
@@ -456,39 +453,38 @@ void thread_set_nice(int new_nice)
 		thread_current()->nice = new_nice;
 }
 
-/* Returns the current thread's nice value. */
 /** NOTE: [Part3]
- * @brief
+ * @brief 현재 실행 중인 쓰레드의 nice 값을 반환하는 함수
  *
- * @return int
+ * @return int 현재 쓰레드의 nice 값
  */
 int thread_get_nice(void)
 {
 	return thread_current()->nice;
 }
 
-/* Returns 100 times the system load average. */
 /** NOTE: [Part3]
- * @brief
+ * @brief 시스템의 평균 부하(load average)를 반환하는 함수
+ * 시스템의 평균 부하를 100배하여 정수로 반환
  *
- * @return int
+ * @return int 시스템의 평균 부하 값에 100을 곱한 후 버림한 정수 값
  */
 int thread_get_load_avg(void)
 {
-	fixed_point load_avg_100_times = mul_fp(load_avg, int_to_fp(100));
-	return fp_to_int_round_zero(load_avg_100_times);
+	fixed_point load_avg_100_times = mul_fp(load_avg, int_to_fp(100)); /* 100배 */
+	return fp_to_int_round_zero(load_avg_100_times);				   /* 정수로 변환 후 반환 */
 }
 
-/* Returns 100 times the current thread's recent_cpu value. */
 /** NOTE: [Part3]
- * @brief
+ * @brief 현재 실행 중인 쓰레드의 최근 CPU 사용량을 반환하는 함수
+ * 현재 실행 중인 쓰레드의 최근 CPU 사용량을 100배하여 정수로 반환
  *
- * @return int
+ * @return int 현재 쓰레드의 최근 CPU 사용량에 100을 곱한 후 버림한 정수 값
  */
 int thread_get_recent_cpu(void)
 {
-	fixed_point recent_cpu_100_times = mul_fp(thread_current()->recent_cpu, int_to_fp(100));
-	return fp_to_int_round_zero(recent_cpu_100_times);
+	fixed_point recent_cpu_100_times = mul_fp(thread_current()->recent_cpu, int_to_fp(100)); /* 100배 */
+	return fp_to_int_round_zero(recent_cpu_100_times);										 /* 정수로 변환 후 반환 */
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
