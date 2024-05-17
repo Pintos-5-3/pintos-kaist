@@ -29,8 +29,11 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
-/* 상태가 THREAD_BLOCKED인 프로세스들의 리스트 */
+/* NOTE: [Part1] 상태가 THREAD_BLOCKED인 쓰레드들의 리스트 */
 static struct list sleep_list;
+
+/* NOTE: [Improve] 모든 쓰레드를 담는 리스트 */
+static struct list all_list;
 
 /* 쓰레드들의 wakeup_tick 중 최소값을 저장하는 전역변수 */
 static int64_t global_tick;
@@ -123,6 +126,7 @@ void thread_init(void)
 	lock_init(&tid_lock);
 	list_init(&ready_list);
 	list_init(&sleep_list); /* sleep list 초기화 */
+	list_init(&all_list);	/* NOTE: [Improve] all list 초기화 */
 	list_init(&destruction_req);
 
 	global_tick = INT64_MAX; /* global tick 초기화 */
@@ -221,6 +225,9 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+
+	/* NOTE: [Improve] 모든 쓰레드 생성 시 all_list에 추가 */
+	// list_push_back(&all_list, &t->all_elem);
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -423,13 +430,15 @@ void thread_wakeup(int64_t curr_tick)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
-	if (!thread_mlfqs)
-	{
-		/* NOTE: donation 고려하여 우선순위 설정 */
-		if (thread_current()->origin_priority == thread_current()->priority)
-			thread_current()->priority = new_priority;
-		thread_current()->origin_priority = new_priority;
-	}
+
+	if (thread_mlfqs)
+		return;
+
+	/* NOTE: donation 고려하여 우선순위 설정 */
+	if (thread_current()->origin_priority == thread_current()->priority)
+		thread_current()
+			->priority = new_priority;
+	thread_current()->origin_priority = new_priority;
 
 	/**
 	 * NOTE: Reorder the ready_list
@@ -449,8 +458,12 @@ int thread_get_priority(void)
  */
 void thread_set_nice(int new_nice)
 {
+	enum intr_level old_level = intr_disable();
 	if (thread_current() != idle_thread)
 		thread_current()->nice = new_nice;
+	thread_calc_priority(thread_current());
+	thread_preempt();
+	intr_set_level(old_level);
 }
 
 /** NOTE: [Part3]
@@ -460,7 +473,10 @@ void thread_set_nice(int new_nice)
  */
 int thread_get_nice(void)
 {
-	return thread_current()->nice;
+	enum intr_level old_level = intr_disable();
+	int nice = thread_current()->nice;
+	intr_set_level(old_level);
+	return nice;
 }
 
 /** NOTE: [Part3]
@@ -471,8 +487,12 @@ int thread_get_nice(void)
  */
 int thread_get_load_avg(void)
 {
+	enum intr_level old_level = intr_disable();
 	fixed_point load_avg_100_times = mul_fp(load_avg, int_to_fp(100)); /* 100배 */
-	return fp_to_int_round_zero(load_avg_100_times);				   /* 정수로 변환 후 반환 */
+	int load_avg = fp_to_int_round_zero(load_avg_100_times);		   /* 정수로 변환 */
+	intr_set_level(old_level);
+
+	return load_avg;
 }
 
 /** NOTE: [Part3]
@@ -483,8 +503,12 @@ int thread_get_load_avg(void)
  */
 int thread_get_recent_cpu(void)
 {
+	enum intr_level old_level = intr_disable();
 	fixed_point recent_cpu_100_times = mul_fp(thread_current()->recent_cpu, int_to_fp(100)); /* 100배 */
-	return fp_to_int_round_zero(recent_cpu_100_times);										 /* 정수로 변환 후 반환 */
+	int recent_cpu = fp_to_int_round_zero(recent_cpu_100_times);							 /* 정수로 변환 */
+	intr_set_level(old_level);
+
+	return recent_cpu;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -560,6 +584,9 @@ init_thread(struct thread *t, const char *name, int priority)
 	/* NOTE: [Part3] MLFQ를 위한 데이터 초기화 */
 	t->nice = 0;
 	t->recent_cpu = 0;
+
+	/* NOTE: [Improve] 모든 쓰레드 생성 시 all_list에 추가 */
+	list_push_back(&all_list, &t->all_elem);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -686,6 +713,7 @@ do_schedule(int status)
 	{
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
+		list_remove(&victim->all_elem); /* NOTE: [Improve] 쓰레드가 죽을 때 all_list에서 제거 */
 		palloc_free_page(victim);
 	}
 	thread_current()->status = status;
@@ -849,71 +877,32 @@ void thread_incr_recent_cpu()
 		curr->recent_cpu = add_fp(curr->recent_cpu, int_to_fp(1));
 }
 
-/* FIXME: [Improve] 현재는 모든 쓰레드를 재계산하지 못 하고 있음. -> 모든 쓰레드를 재계산하도록 수정 */
-
-/* NOTE: [Part3] `모든` 쓰레드의 우선순위를 재계산하는 함수 구현 */
+/* NOTE: [Part3/Improve] `모든` 쓰레드의 우선순위를 재계산하는 함수 구현 */
 void thread_all_calc_priority()
 {
-	struct thread *curr = thread_current();
-	if (curr != idle_thread)
-		thread_calc_priority(curr);
-
 	struct list_elem *e;
 	struct thread *t;
 
-	if (!list_empty(&ready_list))
+	e = list_begin(&all_list);
+	while (e != list_end(&all_list))
 	{
-		e = list_front(&ready_list);
-		while (e != list_end(&ready_list))
-		{
-			t = list_entry(e, struct thread, elem);
-			thread_calc_priority(t);
-			e = list_next(e);
-		}
-	}
-
-	if (!list_empty(&sleep_list))
-	{
-		e = list_front(&sleep_list);
-		while (e != list_end(&sleep_list))
-		{
-			t = list_entry(e, struct thread, elem);
-			thread_calc_priority(t);
-			e = list_next(e);
-		}
+		t = list_entry(e, struct thread, all_elem);
+		thread_calc_priority(t);
+		e = list_next(e);
 	}
 }
 
-/* NOTE: [Part3] `모든` 쓰레드의 recent_cpu를 재계산하는 함수 구현 */
+/* NOTE: [Part3/Improve] `모든` 쓰레드의 recent_cpu를 재계산하는 함수 구현 */
 void thread_all_calc_recent_cpu()
 {
-	struct thread *curr = thread_current();
-	if (curr != idle_thread)
-		thread_calc_recent_cpu(curr);
-
 	struct list_elem *e;
 	struct thread *t;
 
-	if (!list_empty(&ready_list))
+	e = list_begin(&all_list);
+	while (e != list_end(&all_list))
 	{
-		e = list_front(&ready_list);
-
-		while (e != list_end(&ready_list))
-		{
-			t = list_entry(e, struct thread, elem);
-			thread_calc_recent_cpu(t);
-			e = list_next(e);
-		}
-	}
-
-	if (!list_empty(&sleep_list))
-	{
-		e = list_front(&sleep_list);
-		while (e != list_end(&sleep_list))
-		{
-			t = list_entry(e, struct thread, elem);
-			thread_calc_recent_cpu(t);
-			e = list_next(e);
-		}
+		t = list_entry(e, struct thread, all_elem);
+		thread_calc_recent_cpu(t);
+		e = list_next(e);
 	}
 }

@@ -108,6 +108,9 @@ struct thread
 	int nice;			/* 쓰레드의 친절함을 나타내는 지표 */
 	int32_t recent_cpu; /* 쓰레드의 최근 CPU 사용량을 나타내는 지표 */
 
+	/* NOTE: [Improve] all_list element */
+	struct list_elem all_elem;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
