@@ -93,6 +93,10 @@ struct thread
 	char name[16];			   /* Name (for debugging purposes). */
 	int priority;			   /* Priority. */
 	int64_t wakeup_tick;	   /* wakeup 할 시간 저장 */
+	struct list donations;
+	struct list_elem donation_elem;
+	int origin_priority;
+	struct lock *wait_on_lock;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
@@ -133,7 +137,7 @@ tid_t thread_tid(void);
 const char *thread_name(void);
 
 void thread_exit(void) NO_RETURN;
-void thread_compare_yield(struct thread *t);
+void thread_compare_yield(void);
 void thread_yield(void);
 void thread_sleep(int64_t wakeup_tick);
 void thread_wakeup(int64_t curr_tick);
@@ -146,6 +150,9 @@ void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
+//static cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux);
+
+bool compare_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED);
 void do_iret(struct intr_frame *tf);
 
 #endif /* threads/thread.h */
