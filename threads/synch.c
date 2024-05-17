@@ -445,8 +445,9 @@ static void priority_donation(struct thread *t)
 	else
 	{
 		struct thread *highest = list_entry(list_front(&t->donations), struct thread, d_elem);
-		/* TODO: [Improve] 현재 본인의 우선순위와 비교 필요 */
-		t->priority = highest->priority;
+		/* NOTE: [Improve] 현재 본인의 우선순위와 비교 */
+		if (t->priority < highest->priority)
+			t->priority = highest->priority;
 	}
 
 	/* 현재 쓰레드가 락을 기다리고 있는 경우, 락의 소유자에게 재귀적으로 우선순위 기부 */
