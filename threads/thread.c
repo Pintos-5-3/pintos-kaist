@@ -849,6 +849,8 @@ void thread_incr_recent_cpu()
 		curr->recent_cpu = add_fp(curr->recent_cpu, int_to_fp(1));
 }
 
+/* FIXME: [Improve] 현재는 모든 쓰레드를 재계산하지 못 하고 있음. -> 모든 쓰레드를 재계산하도록 수정 */
+
 /* NOTE: [Part3] `모든` 쓰레드의 우선순위를 재계산하는 함수 구현 */
 void thread_all_calc_priority()
 {

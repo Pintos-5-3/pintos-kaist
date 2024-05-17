@@ -445,6 +445,7 @@ static void priority_donation(struct thread *t)
 	else
 	{
 		struct thread *highest = list_entry(list_front(&t->donations), struct thread, d_elem);
+		/* TODO: [Improve] 현재 본인의 우선순위와 비교 필요 */
 		t->priority = highest->priority;
 	}
 
