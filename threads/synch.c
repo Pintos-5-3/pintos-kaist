@@ -448,6 +448,8 @@ static void priority_donation(struct thread *t)
 		/* NOTE: [Improve] 본인의 기존 우선순위와 비교 필요 */
 		if (t->origin_priority < highest->priority)
 			t->priority = highest->priority;
+		else
+			t->priority = t->origin_priority;
 	}
 
 	/* 현재 쓰레드가 락을 기다리고 있는 경우, 락의 소유자에게 재귀적으로 우선순위 기부 */
