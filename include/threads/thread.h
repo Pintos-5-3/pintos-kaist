@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/fixed_point.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -97,11 +98,15 @@ struct thread
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
 
-	/* NOTE: Priority donation을 위한 데이터 */
+	/* NOTE: [Part2-3] Priority donation을 위한 데이터 */
 	int origin_priority;	   /* Priority donation 받기 전 원래의 쓰레드 우선순위 */
 	struct list donations;	   /* 이 쓰레드에게 우선순위를 기부한 쓰레드들의 리스트 */
 	struct list_elem d_elem;   /* Donations list element */
 	struct lock *wait_on_lock; /* 이 쓰레드가 현재 대기 중인 락 */
+
+	/* NOTE: [Part3] MLFQ를 위한 데이터 추가 - nice, recent_cpu */
+	int nice;			/* 쓰레드의 친절함을 나타내는 지표 */
+	int32_t recent_cpu; /* 쓰레드의 최근 CPU 사용량을 나타내는 지표 */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -139,7 +144,7 @@ tid_t thread_tid(void);
 const char *thread_name(void);
 
 void thread_exit(void) NO_RETURN;
-void thread_preempt();
+void thread_preempt(void);
 void thread_yield(void);
 void thread_sleep(int64_t wakeup_tick);
 void thread_wakeup(int64_t curr_tick);
@@ -151,6 +156,13 @@ int thread_get_nice(void);
 void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
+
+void thread_calc_priority(struct thread *t);
+void thread_calc_recent_cpu(struct thread *t);
+void thread_incr_recent_cpu(void);
+void calc_load_avg(void);
+void thread_all_calc_priority(void);
+void thread_all_calc_recent_cpu(void);
 
 void do_iret(struct intr_frame *tf);
 bool cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);

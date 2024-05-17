@@ -149,6 +149,25 @@ timer_interrupt(struct intr_frame *args UNUSED)
 	ticks++;
 	thread_tick();
 
+	/**
+	 * NOTE: [Part3]
+	 * - 4 tick마다 모든 쓰레드의 우선순위 재계산
+	 * - 1 sec마다 load_avg, recent_cpu 재계산
+	 */
+	if (thread_mlfqs)
+	{
+		thread_incr_recent_cpu();
+
+		if (timer_ticks() % 4 == 0)
+			thread_all_calc_priority();
+
+		if (timer_ticks() % TIMER_FREQ == 0)
+		{
+			calc_load_avg();
+			thread_all_calc_recent_cpu();
+		}
+	}
+
 	thread_wakeup(ticks); /* 지정된 틱 시간에 깨어날 스레드를 깨우는 함수 호출 */
 }
 
