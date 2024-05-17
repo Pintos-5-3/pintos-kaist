@@ -429,7 +429,7 @@ void thread_set_priority(int new_priority)
 	// if(thread_current()->wait_on_lock != NULL){
 	// 	update_donate_priority(&thread_current()->wait_on_lock);
 	// }
-	update_donate_priority(thread_current()->wait_on_lock);
+	update_donate_priority();
 	if (!list_empty(&ready_list))
 	{
 		struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
