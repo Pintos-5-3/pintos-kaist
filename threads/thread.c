@@ -422,7 +422,7 @@ void thread_wakeup(int64_t curr_tick)
 		{
 			e = list_remove(e); /* sleep_list에서 제거 */
 			thread_unblock(t);	/* 쓰레드 block 해제 후 */
-			thread_compare_yield();
+			// thread_compare_yield();
 			set_global_tick(get_min_tick()); /* global_tick 갱신 */
 		}
 		else
@@ -474,7 +474,7 @@ void thread_set_nice(int new_nice)
 	if (thread_current() != idle_thread)
 		thread_current()->nice = new_nice;
 	thread_calc_priority(thread_current());
-	thread_preempt();
+	thread_compare_yield();
 	intr_set_level(old_level);
 }
 
@@ -837,93 +837,6 @@ bool compare_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED
 	return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 	//++ 우선순위 비교해주는 함수 (list_insert_ordered에 인자로 넣어줌)
 	// a가 더 크면 true, b가 더 크면 false 반환
-}
-
-/* NOTE: [Part3] recent_cpu와 nice를 이용해 priority를 계산하는 함수 구현 */
-void thread_calc_priority(struct thread *t)
-{
-	fixed_point quarter_cpu = div_fp(t->recent_cpu, int_to_fp(4));
-	int cpu_to_priority = fp_to_int_round_zero(quarter_cpu);
-	int nice_to_priority = t->nice * 2;
-
-	t->priority = PRI_MAX - cpu_to_priority - nice_to_priority;
-}
-
-/* NOTE: [Part3] recent_cpu를 계산하는 함수 구현 */
-void thread_calc_recent_cpu(struct thread *t)
-{
-	/* 계산에 필요한 정수를 고정 소수점 값으로 변경 */
-	fixed_point one = int_to_fp(1);
-	fixed_point two = int_to_fp(2);
-
-	/* decay 계산 */
-	fixed_point double_load_avg = mul_fp(two, load_avg);
-	fixed_point double_load_avg_plus_one = add_fp(double_load_avg, one);
-	fixed_point decay = div_fp(double_load_avg, double_load_avg_plus_one);
-
-	/* 감쇄된 recent_cpu 및 고정 소수점 값으로 변환한 nice */
-	fixed_point decayed_recent_cpu = mul_fp(decay, t->recent_cpu);
-	fixed_point nice_fp = int_to_fp(t->nice);
-
-	t->recent_cpu = add_fp(decayed_recent_cpu, nice_fp);
-}
-
-/* NOTE: [Part3] load_avg를 계산하는 함수 구현 */
-void calc_load_avg()
-{
-	/* 계산에 필요한 가중치 계산 */
-	fixed_point weight_59 = div_fp(int_to_fp(59), int_to_fp(60));
-	fixed_point weight_1 = div_fp(int_to_fp(1), int_to_fp(60));
-
-	/* read_thread 계산: ready_list에 담긴 쓰레드의 개수 + 실행 중인 쓰레드의 개수 (idle 제외) */
-	fixed_point count_ready_threads = int_to_fp(list_size(&ready_list));
-	if (thread_current() != idle_thread)
-		count_ready_threads = add_fp(count_ready_threads, int_to_fp(1));
-
-	/* 가중치 적용 */
-	fixed_point weighted_avg = mul_fp(weight_59, load_avg);
-	fixed_point weighted_ready_threads = mul_fp(weight_1, count_ready_threads);
-
-	load_avg = add_fp(weighted_avg, weighted_ready_threads);
-}
-
-/* NOTE: [Part3] recent_cpu를 1씩 증가시키는 함수 구현 */
-void thread_incr_recent_cpu()
-{
-	struct thread *curr = thread_current();
-
-	if (curr != idle_thread)
-		curr->recent_cpu = add_fp(curr->recent_cpu, int_to_fp(1));
-}
-
-/* NOTE: [Part3/Improve] `모든` 쓰레드의 우선순위를 재계산하는 함수 구현 */
-void thread_all_calc_priority()
-{
-	struct list_elem *e;
-	struct thread *t;
-
-	e = list_begin(&all_list);
-	while (e != list_end(&all_list))
-	{
-		t = list_entry(e, struct thread, all_elem);
-		thread_calc_priority(t);
-		e = list_next(e);
-	}
-}
-
-/* NOTE: [Part3/Improve] `모든` 쓰레드의 recent_cpu를 재계산하는 함수 구현 */
-void thread_all_calc_recent_cpu()
-{
-	struct list_elem *e;
-	struct thread *t;
-
-	e = list_begin(&all_list);
-	while (e != list_end(&all_list))
-	{
-		t = list_entry(e, struct thread, all_elem);
-		thread_calc_recent_cpu(t);
-		e = list_next(e);
-	}
 }
 
 /* NOTE: [Part3] recent_cpu와 nice를 이용해 priority를 계산하는 함수 구현 */

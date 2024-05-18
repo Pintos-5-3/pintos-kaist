@@ -420,7 +420,7 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
 	 * NOTE: waiters 정렬
 	 * part: priority-sync
 	 */
-	list_sort(&cond->waiters, cmp_priority_by_sema, NULL);
+	list_sort(&cond->waiters, cmp_priority_donation, NULL);
 	if (!list_empty(&cond->waiters))
 		list_sort(&cond->waiters, cmp_condition, 0);
 	sema_up(&list_entry(list_pop_front(&cond->waiters),
@@ -458,57 +458,6 @@ static bool cmp_priority_donation(const struct list_elem *a_, const struct list_
 	struct thread *b = list_entry(b_, struct thread, d_elem);
 
 	return a->priority > b->priority;
-}
-
-/**
- * @brief 두 세마포어의 우선순위를 비교하는 함수
- *
- * @param a_ 첫 번째 리스트 요소
- * @param b_ 두 번째 리스트 요소
- * @param UNUSED 사용하지 않는 매개변수
- * @return true 첫 번째 세마포어의 우선순위가 두 번째 세마포어보다 높은 경우 true 반환
- * @return false 그렇지 않은 경우 false 반환
- */
-static bool cmp_priority_by_sema(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED)
-{
-	struct semaphore_elem *a_sema = list_entry(a_, struct semaphore_elem, elem);
-	struct semaphore_elem *b_sema = list_entry(b_, struct semaphore_elem, elem);
-
-	/* semaphore.waiters 리스트가 빈 리스트인 경우 예외처리 */
-	if (!list_empty(&a_sema->semaphore.waiters) && !list_empty(&b_sema->semaphore.waiters))
-	{
-		cmp_priority(list_front(&a_sema->semaphore.waiters), list_front(&b_sema->semaphore.waiters), NULL);
-	}
-	else
-		return false;
-}
-
-/**
- * @brief 우선순위를 기부받고, 필요한 경우 우선순위 기부를 재귀적으로 수행하는 함수
- *
- * @param t 우선순위를 기부받을 쓰레드
- */
-static void priority_donation(struct thread *t)
-{
-	ASSERT(t != NULL);
-
-	/* 리스트가 비어있는 경우 - 원래의 우선순위로 복구 */
-	if (list_empty(&t->donations))
-		t->priority = t->origin_priority;
-	/* 그렇지 않은 경우 - donations 중 우선순위가 가장 높은 쓰레드에게 우선순위 기부 받기 */
-	else
-	{
-		struct thread *highest = list_entry(list_front(&t->donations), struct thread, d_elem);
-		/* NOTE: [Improve] 본인의 기존 우선순위와 비교 필요 */
-		if (t->origin_priority < highest->priority)
-			t->priority = highest->priority;
-		else
-			t->priority = t->origin_priority;
-	}
-
-	/* 현재 쓰레드가 락을 기다리고 있는 경우, 락의 소유자에게 재귀적으로 우선순위 기부 */
-	if (t->wait_on_lock)
-		priority_donation(t->wait_on_lock->holder);
 }
 
 /**
