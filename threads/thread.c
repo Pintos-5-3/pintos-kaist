@@ -11,6 +11,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "threads/fixed_point.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -28,8 +29,11 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
-/* 상태가 THREAD_BLOCKED인 프로세스들의 리스트 */
+/* NOTE: [Part1] 상태가 THREAD_BLOCKED인 쓰레드들의 리스트 */
 static struct list sleep_list;
+
+/* NOTE: [Improve] 모든 쓰레드를 담는 리스트 */
+static struct list all_list;
 
 /* 쓰레드들의 wakeup_tick 중 최소값을 저장하는 전역변수 */
 static int64_t global_tick;
@@ -55,6 +59,9 @@ static long long user_ticks;   /* # of timer ticks in user programs. */
 #define TIME_SLICE 4		  /* # of timer ticks to give each thread. */
 static unsigned thread_ticks; /* # of timer ticks since last yield. */
 
+/* NOTE: [Part3] 시스템 부하 */
+fixed_point load_avg;
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -69,7 +76,7 @@ static void do_schedule(int status);
 static void schedule(void);
 static tid_t allocate_tid(void);
 
-static int64_t get_min_tick();
+static int64_t get_min_tick(void);
 static int set_global_tick(int64_t tick);
 static bool wakeup_less(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
@@ -119,9 +126,11 @@ void thread_init(void)
 	lock_init(&tid_lock);
 	list_init(&ready_list);
 	list_init(&sleep_list); /* sleep list 초기화 */
+	list_init(&all_list);	/* NOTE: [Improve] all list 초기화 */
 	list_init(&destruction_req);
 
 	global_tick = INT64_MAX; /* global tick 초기화 */
+	load_avg = int_to_fp(0); /* NOTE: [Part3] load_avg 초기화 */
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread();
@@ -216,6 +225,9 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+
+	/* NOTE: [Improve] 모든 쓰레드 생성 시 all_list에 추가 */
+	// list_push_back(&all_list, &t->all_elem);
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -320,11 +332,13 @@ void thread_exit(void)
 
 void thread_compare_yield(void)
 {
-	if (thread_current() == idle_thread){
+	if (thread_current() == idle_thread)
+	{
 		return;
 	}
 
-	if(list_empty(&ready_list)){
+	if (list_empty(&ready_list))
+	{
 		return;
 	}
 
@@ -398,7 +412,6 @@ void thread_wakeup(int64_t curr_tick)
 
 	struct list_elem *e;
 	struct thread *t;
-	enum intr_level old_level;
 
 	e = list_begin(&sleep_list);
 	while (e != list_end(&sleep_list)) /* sleep_list를 순회하며 깨어날 쓰레드 처리 */
@@ -407,19 +420,28 @@ void thread_wakeup(int64_t curr_tick)
 
 		if (t->wakeup_tick <= curr_tick) /* wakeup 필요 */
 		{
-			e = list_remove(e);				 /* sleep_list에서 제거 */
-			thread_unblock(t);				 /* 쓰레드 block 해제 후 */
-			thread_compare_yield();
+			e = list_remove(e); /* sleep_list에서 제거 */
+			thread_unblock(t);	/* 쓰레드 block 해제 후 */
+			// thread_compare_yield();
 			set_global_tick(get_min_tick()); /* global_tick 갱신 */
 		}
 		else
 			e = e->next;
 	}
+	set_global_tick(get_min_tick()); /* global_tick 갱신 */
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
+
+	if (thread_mlfqs)
+		return;
+
+	/* NOTE: donation 고려하여 우선순위 설정 */
+	if (thread_current()->origin_priority == thread_current()->priority)
+		thread_current()
+			->priority = new_priority;
 	thread_current()->origin_priority = new_priority;
 
 	/**
@@ -443,31 +465,62 @@ int thread_get_priority(void)
 	return thread_current()->priority;
 }
 
-/* Sets the current thread's nice value to NICE. */
-void thread_set_nice(int nice UNUSED)
+/** NOTE: [Part3]
+ * @brief 현재 실행 중인 쓰레드의 nice 값을 설정하는 함수
+ */
+void thread_set_nice(int new_nice)
 {
-	/* TODO: Your implementation goes here */
+	enum intr_level old_level = intr_disable();
+	if (thread_current() != idle_thread)
+		thread_current()->nice = new_nice;
+	thread_calc_priority(thread_current());
+	thread_compare_yield();
+	intr_set_level(old_level);
 }
 
-/* Returns the current thread's nice value. */
+/** NOTE: [Part3]
+ * @brief 현재 실행 중인 쓰레드의 nice 값을 반환하는 함수
+ *
+ * @return int 현재 쓰레드의 nice 값
+ */
 int thread_get_nice(void)
 {
-	/* TODO: Your implementation goes here */
-	return 0;
+	enum intr_level old_level = intr_disable();
+	int nice = thread_current()->nice;
+	intr_set_level(old_level);
+	return nice;
 }
 
-/* Returns 100 times the system load average. */
+/** NOTE: [Part3]
+ * @brief 시스템의 평균 부하(load average)를 반환하는 함수
+ * 시스템의 평균 부하를 100배하여 정수로 반환
+ *
+ * @return int 시스템의 평균 부하 값에 100을 곱한 후 버림한 정수 값
+ */
 int thread_get_load_avg(void)
 {
-	/* TODO: Your implementation goes here */
-	return 0;
+	enum intr_level old_level = intr_disable();
+	fixed_point load_avg_100_times = mul_fp(load_avg, int_to_fp(100)); /* 100배 */
+	int load_avg = fp_to_int_round_zero(load_avg_100_times);		   /* 정수로 변환 */
+	intr_set_level(old_level);
+
+	return load_avg;
 }
 
-/* Returns 100 times the current thread's recent_cpu value. */
+/** NOTE: [Part3]
+ * @brief 현재 실행 중인 쓰레드의 최근 CPU 사용량을 반환하는 함수
+ * 현재 실행 중인 쓰레드의 최근 CPU 사용량을 100배하여 정수로 반환
+ *
+ * @return int 현재 쓰레드의 최근 CPU 사용량에 100을 곱한 후 버림한 정수 값
+ */
 int thread_get_recent_cpu(void)
 {
-	/* TODO: Your implementation goes here */
-	return 0;
+	enum intr_level old_level = intr_disable();
+	fixed_point recent_cpu_100_times = mul_fp(thread_current()->recent_cpu, int_to_fp(100)); /* 100배 */
+	int recent_cpu = fp_to_int_round_zero(recent_cpu_100_times);							 /* 정수로 변환 */
+	intr_set_level(old_level);
+
+	return recent_cpu;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -536,9 +589,16 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
-	t->wait_on_lock = NULL;
-	t->origin_priority = priority;
+	/* NOTE: donation을 위한 데이터 초기화 */
 	list_init(&t->donations);
+	t->origin_priority = priority;
+
+	/* NOTE: [Part3] MLFQ를 위한 데이터 초기화 */
+	t->nice = 0;
+	t->recent_cpu = 0;
+
+	/* NOTE: [Improve] 모든 쓰레드 생성 시 all_list에 추가 */
+	list_push_back(&all_list, &t->all_elem);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -665,6 +725,7 @@ do_schedule(int status)
 	{
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
+		list_remove(&victim->all_elem); /* NOTE: [Improve] 쓰레드가 죽을 때 all_list에서 제거 */
 		palloc_free_page(victim);
 	}
 	thread_current()->status = status;
@@ -726,11 +787,11 @@ allocate_tid(void)
 	return tid;
 }
 
-static int64_t get_min_tick()
+static int64_t get_min_tick(void)
 {
 	if (list_empty(&sleep_list))
 		return INT64_MAX;
-	return list_min(&sleep_list, wakeup_less, NULL);
+	return list_entry(list_min(&sleep_list, wakeup_less, NULL), struct thread, elem)->wakeup_tick;
 }
 
 static int set_global_tick(int64_t tick)
@@ -776,4 +837,91 @@ bool compare_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED
 	return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 	//++ 우선순위 비교해주는 함수 (list_insert_ordered에 인자로 넣어줌)
 	// a가 더 크면 true, b가 더 크면 false 반환
+}
+
+/* NOTE: [Part3] recent_cpu와 nice를 이용해 priority를 계산하는 함수 구현 */
+void thread_calc_priority(struct thread *t)
+{
+	fixed_point quarter_cpu = div_fp(t->recent_cpu, int_to_fp(4));
+	int cpu_to_priority = fp_to_int_round_zero(quarter_cpu);
+	int nice_to_priority = t->nice * 2;
+
+	t->priority = PRI_MAX - cpu_to_priority - nice_to_priority;
+}
+
+/* NOTE: [Part3] recent_cpu를 계산하는 함수 구현 */
+void thread_calc_recent_cpu(struct thread *t)
+{
+	/* 계산에 필요한 정수를 고정 소수점 값으로 변경 */
+	fixed_point one = int_to_fp(1);
+	fixed_point two = int_to_fp(2);
+
+	/* decay 계산 */
+	fixed_point double_load_avg = mul_fp(two, load_avg);
+	fixed_point double_load_avg_plus_one = add_fp(double_load_avg, one);
+	fixed_point decay = div_fp(double_load_avg, double_load_avg_plus_one);
+
+	/* 감쇄된 recent_cpu 및 고정 소수점 값으로 변환한 nice */
+	fixed_point decayed_recent_cpu = mul_fp(decay, t->recent_cpu);
+	fixed_point nice_fp = int_to_fp(t->nice);
+
+	t->recent_cpu = add_fp(decayed_recent_cpu, nice_fp);
+}
+
+/* NOTE: [Part3] load_avg를 계산하는 함수 구현 */
+void calc_load_avg()
+{
+	/* 계산에 필요한 가중치 계산 */
+	fixed_point weight_59 = div_fp(int_to_fp(59), int_to_fp(60));
+	fixed_point weight_1 = div_fp(int_to_fp(1), int_to_fp(60));
+
+	/* read_thread 계산: ready_list에 담긴 쓰레드의 개수 + 실행 중인 쓰레드의 개수 (idle 제외) */
+	fixed_point count_ready_threads = int_to_fp(list_size(&ready_list));
+	if (thread_current() != idle_thread)
+		count_ready_threads = add_fp(count_ready_threads, int_to_fp(1));
+
+	/* 가중치 적용 */
+	fixed_point weighted_avg = mul_fp(weight_59, load_avg);
+	fixed_point weighted_ready_threads = mul_fp(weight_1, count_ready_threads);
+
+	load_avg = add_fp(weighted_avg, weighted_ready_threads);
+}
+
+/* NOTE: [Part3] recent_cpu를 1씩 증가시키는 함수 구현 */
+void thread_incr_recent_cpu()
+{
+	struct thread *curr = thread_current();
+
+	if (curr != idle_thread)
+		curr->recent_cpu = add_fp(curr->recent_cpu, int_to_fp(1));
+}
+
+/* NOTE: [Part3/Improve] `모든` 쓰레드의 우선순위를 재계산하는 함수 구현 */
+void thread_all_calc_priority()
+{
+	struct list_elem *e;
+	struct thread *t;
+
+	e = list_begin(&all_list);
+	while (e != list_end(&all_list))
+	{
+		t = list_entry(e, struct thread, all_elem);
+		thread_calc_priority(t);
+		e = list_next(e);
+	}
+}
+
+/* NOTE: [Part3/Improve] `모든` 쓰레드의 recent_cpu를 재계산하는 함수 구현 */
+void thread_all_calc_recent_cpu()
+{
+	struct list_elem *e;
+	struct thread *t;
+
+	e = list_begin(&all_list);
+	while (e != list_end(&all_list))
+	{
+		t = list_entry(e, struct thread, all_elem);
+		thread_calc_recent_cpu(t);
+		e = list_next(e);
+	}
 }
