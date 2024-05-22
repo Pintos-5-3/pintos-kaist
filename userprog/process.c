@@ -18,6 +18,11 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+/* NOTE: [Part1] 실행에 필요한 헤더 파일 include*/
+#include "lib/string.h"
+#include "lib/stdio.h"
+#include "threads/loader.h"
+
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -26,19 +31,13 @@ static void process_cleanup(void);
 static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
+static void argument_stack(char **parse, int count, void **rsp);
 
 /* General process initializer for initd and other process. */
-static void
-process_init(void)
+static void process_init(void)
 {
 	struct thread *current = thread_current();
 }
-
-/* [Part1] For Argument Passing */
-
-/* TODO: [Part1] 문자열을 구분자로 파싱하는 함수 구현 */
-
-/* [Part1] For Argument Passing */
 
 /**
  * @brief "initd"라고 불리는 첫 번째 유저 레벨 프로그램을 시작하는 함수 /
@@ -60,10 +59,12 @@ tid_t process_create_initd(const char *file_name) /* NOTE: process_excute() */
 		return TID_ERROR;
 	strlcpy(fn_copy, file_name, PGSIZE);
 
-	/* TODO: [Part1] Parse command line and get program name */
+	/* NOTE: [Part1] program_name 파싱해서 thread_create에 전달 */
+	char *program_name, *save_ptr;
+	program_name = strtok_r(file_name, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create(file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create(program_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page(fn_copy);
 	return tid;
@@ -76,7 +77,6 @@ initd(void *f_name)
 #ifdef VM
 	supplemental_page_table_init(&thread_current()->spt);
 #endif
-
 	process_init();
 
 	if (process_exec(f_name) < 0)
@@ -177,13 +177,16 @@ error:
 /**
  * @brief 현재 실행 컨텍스트를 f_name이 가리키는 프로세스로 전환하는 함수
  *
- * @param f_name 실행할 프로세스의 이름
+ * @param f_name 실행할 프로세스의 이름 (파싱 안 된 값)
  * @return int 실패 시 -1 반환
  */
 int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 {
-	char *file_name = f_name;
+	char *file_name, *save_ptr;
 	bool success;
+
+	/* NOTE: f_name에서 프로그램 이름 파싱 */
+	file_name = strtok_r(f_name, " ", &save_ptr);
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -200,15 +203,81 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	success = load(file_name, &_if);
 
 	/* If load failed, quit. */
-	palloc_free_page(file_name);
 	if (!success)
+	{
+		palloc_free_page(f_name);
 		return -1;
+	}
 
-	/* TODO: [Part1] set up stack */
+	/* NOTE: [Part1] token들을 parse에 저장 */
+	char **parse = malloc(128 * sizeof(char *));
+
+	int count = 0;
+	strlcpy(parse, file_name, strlen(file_name) + 1);
+	count++;
+
+	char *token = strtok_r(NULL, " ", &save_ptr);
+	while (token != NULL)
+	{
+		strlcpy(parse + count * sizeof(char *), token, strlen(token) + 1);
+		token = strtok_r(NULL, " ", &save_ptr);
+		count++;
+	}
+	*(parse + count * sizeof(char *)) = NULL;
+
+	/* NOTE: [Part1] 스택에 인자 push 후 dump로 출력 */
+	argument_stack(parse, count, &_if.rsp);
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+
+	free(parse);
+	palloc_free_page(f_name);
 
 	/* Start switched process. */
 	do_iret(&_if);
 	NOT_REACHED();
+}
+
+/**
+ * @brief
+ *
+ * @param parse 프로그램 이름과 인자가 저장되어 있는 메모리 공간
+ * @param count 인자의 개수
+ * @param esp 스택 포인터를 가리키는 주소 값
+ */
+static void argument_stack(char **parse, int count, void **rsp)
+{
+	char *address[count + 1];
+	memset(address, NULL, sizeof(address));
+
+	int len;
+	/* Argument */
+	for (int i = count - 1; i > -1; i--)
+	{
+		len = strlen(parse + i * sizeof(char *)) + 1;
+		*rsp = *rsp - len;
+		memcpy(*rsp, parse + i * sizeof(char *), len);
+		address[i] = *rsp;
+	}
+
+	/* word-align */
+	uint8_t align = (uint8_t)(*rsp) % 8;
+	if (align != 0)
+	{
+		*rsp = *rsp - align;
+		memset(*rsp, 0, align);
+	}
+
+	/* Argument의 주소 */
+	for (int i = count; i > -1; i--)
+	{
+		*rsp = *rsp - sizeof(char *);
+		*(char **)(*rsp) = address[i];
+		printf("%p\n", address[i]);
+	}
+
+	/* fake addreass(0) */
+	*rsp = *rsp - sizeof(void (*)());
+	*(void (**)())(*rsp) = 0;
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -225,6 +294,9 @@ int process_wait(tid_t child_tid UNUSED)
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	for (;;)
+	{
+	}
 	return -1;
 }
 
