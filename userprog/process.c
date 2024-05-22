@@ -162,8 +162,13 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	char *file_name = f_name;
+	char *token, *saveptr;
+	char *file_name = strtok_r(f_name, " ", &saveptr);
 	bool success;
+	for (token = strtok_r(NULL, " ", &saveptr); token != NULL; token = strtok_r(NULL, " ", &saveptr)) {
+		
+	}
+
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -204,6 +209,11 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	while (true)
+	{
+		/* code */
+	}
+	
 	return -1;
 }
 
@@ -329,6 +339,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	// hex_dump(&file_ofs, )
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
