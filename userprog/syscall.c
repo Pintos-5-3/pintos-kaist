@@ -7,6 +7,8 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+/* TODO: 구현에 필요한 라이브러리 include */
+#include "include/threads/init.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -51,10 +53,11 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	thread_exit();
 }
 
-/* TODO: [Part2] pintos를 종료시키는 시스템 콜 */
+/* NOTE: [Part2] pintos를 종료시키는 시스템 콜 */
 void halt(void)
 {
-	/* shutdown_power_off()를 사용하여 pintos 종료 */
+	/* power_off()를 사용하여 pintos 종료 */
+	power_off();
 }
 
 /* TODO: [Part2] 현재 프로세스를 종료시키는 시스템 콜 */
