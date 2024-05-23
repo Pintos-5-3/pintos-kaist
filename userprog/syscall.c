@@ -150,7 +150,7 @@ bool remove(const char *file)
  *
  * @return pid_t
  */
-pid_t exec(const *cmd_line)
+pid_t exec(const char *cmd_line)
 {
 	/* process_execute() 함수를 호출하여 자식 프로세스 생성 */
 	/* 생성된 자식 프로세스의 프로세스 디스크립터를 검색 */
