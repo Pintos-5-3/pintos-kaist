@@ -29,7 +29,7 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
-/* NOTE: [Part1] 상태가 THREAD_BLOCKED인 쓰레드들의 리스트 */
+/* NOTE: [1.1] 상태가 THREAD_BLOCKED인 쓰레드들의 리스트 */
 static struct list sleep_list;
 
 /* NOTE: [Improve] 모든 쓰레드를 담는 리스트 */
@@ -59,7 +59,7 @@ static long long user_ticks;   /* # of timer ticks in user programs. */
 #define TIME_SLICE 4		  /* # of timer ticks to give each thread. */
 static unsigned thread_ticks; /* # of timer ticks since last yield. */
 
-/* NOTE: [Part3] 시스템 부하 */
+/* NOTE: [1.3] 시스템 부하 */
 fixed_point load_avg;
 
 /* If false (default), use round-robin scheduler.
@@ -130,7 +130,7 @@ void thread_init(void)
 	list_init(&destruction_req);
 
 	global_tick = INT64_MAX; /* global tick 초기화 */
-	load_avg = int_to_fp(0); /* NOTE: [Part3] load_avg 초기화 */
+	load_avg = int_to_fp(0); /* NOTE: [1.3] load_avg 초기화 */
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread();
@@ -465,7 +465,7 @@ int thread_get_priority(void)
 	return thread_current()->priority;
 }
 
-/** NOTE: [Part3]
+/** NOTE: [1.3]
  * @brief 현재 실행 중인 쓰레드의 nice 값을 설정하는 함수
  */
 void thread_set_nice(int new_nice)
@@ -478,7 +478,7 @@ void thread_set_nice(int new_nice)
 	intr_set_level(old_level);
 }
 
-/** NOTE: [Part3]
+/** NOTE: [1.3]
  * @brief 현재 실행 중인 쓰레드의 nice 값을 반환하는 함수
  *
  * @return int 현재 쓰레드의 nice 값
@@ -491,7 +491,7 @@ int thread_get_nice(void)
 	return nice;
 }
 
-/** NOTE: [Part3]
+/** NOTE: [1.3]
  * @brief 시스템의 평균 부하(load average)를 반환하는 함수
  * 시스템의 평균 부하를 100배하여 정수로 반환
  *
@@ -507,7 +507,7 @@ int thread_get_load_avg(void)
 	return load_avg;
 }
 
-/** NOTE: [Part3]
+/** NOTE: [1.3]
  * @brief 현재 실행 중인 쓰레드의 최근 CPU 사용량을 반환하는 함수
  * 현재 실행 중인 쓰레드의 최근 CPU 사용량을 100배하여 정수로 반환
  *
@@ -593,7 +593,7 @@ init_thread(struct thread *t, const char *name, int priority)
 	list_init(&t->donations);
 	t->origin_priority = priority;
 
-	/* NOTE: [Part3] MLFQ를 위한 데이터 초기화 */
+	/* NOTE: [1.3] MLFQ를 위한 데이터 초기화 */
 	t->nice = 0;
 	t->recent_cpu = 0;
 
@@ -839,7 +839,7 @@ bool compare_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED
 	// a가 더 크면 true, b가 더 크면 false 반환
 }
 
-/* NOTE: [Part3] recent_cpu와 nice를 이용해 priority를 계산하는 함수 구현 */
+/* NOTE: [1.3] recent_cpu와 nice를 이용해 priority를 계산하는 함수 구현 */
 void thread_calc_priority(struct thread *t)
 {
 	fixed_point quarter_cpu = div_fp(t->recent_cpu, int_to_fp(4));
@@ -849,7 +849,7 @@ void thread_calc_priority(struct thread *t)
 	t->priority = PRI_MAX - cpu_to_priority - nice_to_priority;
 }
 
-/* NOTE: [Part3] recent_cpu를 계산하는 함수 구현 */
+/* NOTE: [1.3] recent_cpu를 계산하는 함수 구현 */
 void thread_calc_recent_cpu(struct thread *t)
 {
 	/* 계산에 필요한 정수를 고정 소수점 값으로 변경 */
@@ -868,7 +868,7 @@ void thread_calc_recent_cpu(struct thread *t)
 	t->recent_cpu = add_fp(decayed_recent_cpu, nice_fp);
 }
 
-/* NOTE: [Part3] load_avg를 계산하는 함수 구현 */
+/* NOTE: [1.3] load_avg를 계산하는 함수 구현 */
 void calc_load_avg()
 {
 	/* 계산에 필요한 가중치 계산 */
@@ -887,7 +887,7 @@ void calc_load_avg()
 	load_avg = add_fp(weighted_avg, weighted_ready_threads);
 }
 
-/* NOTE: [Part3] recent_cpu를 1씩 증가시키는 함수 구현 */
+/* NOTE: [1.3] recent_cpu를 1씩 증가시키는 함수 구현 */
 void thread_incr_recent_cpu()
 {
 	struct thread *curr = thread_current();
@@ -896,7 +896,7 @@ void thread_incr_recent_cpu()
 		curr->recent_cpu = add_fp(curr->recent_cpu, int_to_fp(1));
 }
 
-/* NOTE: [Part3/Improve] `모든` 쓰레드의 우선순위를 재계산하는 함수 구현 */
+/* NOTE: [1.3/Improve] `모든` 쓰레드의 우선순위를 재계산하는 함수 구현 */
 void thread_all_calc_priority()
 {
 	struct list_elem *e;
@@ -911,7 +911,7 @@ void thread_all_calc_priority()
 	}
 }
 
-/* NOTE: [Part3/Improve] `모든` 쓰레드의 recent_cpu를 재계산하는 함수 구현 */
+/* NOTE: [1.3/Improve] `모든` 쓰레드의 recent_cpu를 재계산하는 함수 구현 */
 void thread_all_calc_recent_cpu()
 {
 	struct list_elem *e;

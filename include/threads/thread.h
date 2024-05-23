@@ -103,7 +103,7 @@ struct thread
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
 
-	/* NOTE: [Part3] MLFQ를 위한 데이터 추가 - nice, recent_cpu */
+	/* NOTE: [1.3] MLFQ를 위한 데이터 추가 - nice, recent_cpu */
 	int nice;			/* 쓰레드의 친절함을 나타내는 지표 */
 	int32_t recent_cpu; /* 쓰레드의 최근 CPU 사용량을 나타내는 지표 */
 

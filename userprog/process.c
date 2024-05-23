@@ -18,7 +18,7 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
-/* NOTE: [Part1] 실행에 필요한 헤더 파일 include*/
+/* NOTE: [2.1] 실행에 필요한 헤더 파일 include*/
 #include "lib/string.h"
 #include "lib/stdio.h"
 #include "threads/loader.h"
@@ -59,7 +59,7 @@ tid_t process_create_initd(const char *file_name) /* NOTE: process_excute() */
 		return TID_ERROR;
 	strlcpy(fn_copy, file_name, PGSIZE);
 
-	/* NOTE: [Part1] program_name 파싱해서 thread_create에 전달 */
+	/* NOTE: [2.1] program_name 파싱해서 thread_create에 전달 */
 	char *program_name, *save_ptr;
 	program_name = strtok_r(file_name, " ", &save_ptr);
 
@@ -209,7 +209,7 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 		return -1;
 	}
 
-	/* NOTE: [Part1] token들을 parse에 저장 */
+	/* NOTE: [2.1] token들을 parse에 저장 */
 	char **parse = malloc(128 * sizeof(char *));
 
 	int count = 0;
@@ -225,7 +225,7 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	}
 	*(parse + count * sizeof(char *)) = NULL;
 
-	/* NOTE: [Part1] 스택에 인자 push 후 dump로 출력 */
+	/* NOTE: [2.1] 스택에 인자 push 후 dump로 출력 */
 	argument_stack(parse, count, &_if.rsp);
 	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 	memcpy(&_if.R.rsi, _if.rsp + sizeof(void (*)()), sizeof(char *));
