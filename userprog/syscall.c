@@ -40,6 +40,8 @@ void halt(void);
 void exit(int status);
 bool create(const char *file, unsigned initial_size);
 bool remove(const char *file);
+int wait(pid_t pid);
+pid_t exec(const char *cmd_line);
 void check_address(void *addr);
 void get_argument(void *rsp, int *arg, int count);
 
@@ -57,17 +59,12 @@ void syscall_init(void)
 }
 
 /* The main system call interface */
-void syscall_handler(struct intr_frame *f)
+void syscall_handler(struct intr_frame *f UNUSED)
 {
 	// NOTE: [2.2] Your implementation goes here.
-	// TODO: [2.3] exec 시스템 콜 추가
-	void *rsp = f->rsp;
-	check_address(rsp);
-	int syscall_num = *(int *)rsp;
-	rsp += sizeof(int *);
-
-	int *argv = NULL;
-	bool result;
+	// NOTE: [2.3] exec 시스템 콜 추가
+	uint64_t syscall_num = f->R.rax;
+	printf("syscall number: %llu\n", syscall_num);
 
 	switch (syscall_num)
 	{
@@ -75,21 +72,19 @@ void syscall_handler(struct intr_frame *f)
 		halt();
 		break;
 	case SYS_EXIT:
-		argv = realloc(argv, sizeof(int));
-		get_argument(&rsp, argv, 1);
-		exit(argv[0]);
+		exit(f->R.rdi);
 		break;
 	case SYS_CREATE:
-		argv = realloc(argv, sizeof(int) * 2);
-		get_argument(&rsp, argv, 2);
-		result = create(argv[0], argv[1]);
-		memcpy(f->R.rax, &result, sizeof(bool));
+		f->R.rax = create(f->R.rdi, f->R.rsi);
 		break;
 	case SYS_REMOVE:
-		argv = realloc(argv, sizeof(int));
-		get_argument(&rsp, argv, 1);
-		result = remove(argv[0]);
-		memcpy(f->R.rax, &result, sizeof(bool));
+		f->R.rax = remove(f->R.rdi), sizeof(bool);
+		break;
+	case SYS_EXEC:
+		f->R.rax = exec(f->R.rdi), sizeof(pid_t);
+		break;
+	case SYS_WAIT:
+		f->R.rax = wait(f->R.rdi), sizeof(int);
 		break;
 	default:
 		thread_exit();
@@ -156,7 +151,7 @@ pid_t exec(const char *cmd_line)
 	return child_pid;
 }
 
-/* TODO: [2.3] wait() 시스템 콜 구현 */
+/* NOTE: [2.3] wait() 시스템 콜 구현 */
 int wait(pid_t pid)
 {
 	/* 자식 프로세스가 종료 될 때까지 대기*/
