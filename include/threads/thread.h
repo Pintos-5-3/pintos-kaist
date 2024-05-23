@@ -110,6 +110,16 @@ struct thread
 	/* NOTE: [Improve] all_list element */
 	struct list_elem all_elem;
 
+	/* TODO: [2.3] 프로세스 계층 구조 구현을 위한 데이터 추가 */
+	/* 부모 프로세스의 디스크립터 */
+	/* 자식 리스트 element */
+	/* 자식 리스트 */
+	/* 프로세스의 프로그램 메모리 적재 유무 */
+	/* 프로세스가 종료 유무 확인 */
+	/* exit 세마포어 */
+	/* load 세마포어 */
+	/* exit 호출 시 종료 status */
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */

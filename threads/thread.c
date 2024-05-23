@@ -226,8 +226,13 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-	/* NOTE: [Improve] 모든 쓰레드 생성 시 all_list에 추가 */
-	// list_push_back(&all_list, &t->all_elem);
+	/* TODO: [2.3] 자료구조 초기화 */
+	/* 부모 프로세스 저장 */
+	/* 프로그램이 로드되지 않음 */
+	/* 프로세스가 종료되지 않음 */
+	/* exit 세마포어 0으로 초기화 */
+	/* load 세마포어 0으로 초기화 */
+	/* 자식 리스트에 추가 */
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -322,6 +327,10 @@ void thread_exit(void)
 #ifdef USERPROG
 	process_exit();
 #endif
+
+	/* TODO: [2.3] thread_exit 수정 */
+	/* 프로세스 디스크립터에 프로세스 종료를 알림*/
+	/* 부모프로세스의 대기 상태 이탈(세마포어 이용) */
 
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
@@ -599,6 +608,8 @@ init_thread(struct thread *t, const char *name, int priority)
 
 	/* NOTE: [Improve] 모든 쓰레드 생성 시 all_list에 추가 */
 	list_push_back(&all_list, &t->all_elem);
+
+	/* TODO: [2.3] 자식 리스트 초기화 */
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -726,6 +737,7 @@ do_schedule(int status)
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
 		list_remove(&victim->all_elem); /* NOTE: [Improve] 쓰레드가 죽을 때 all_list에서 제거 */
+		/* TODO: [2.3] 프로세스 디스크립터를 삭제하지 않도록 수정 */
 		palloc_free_page(victim);
 	}
 	thread_current()->status = status;
@@ -924,4 +936,19 @@ void thread_all_calc_recent_cpu()
 		thread_calc_recent_cpu(t);
 		e = list_next(e);
 	}
+}
+
+/* TODO: [2.3] 자식 프로세스 검색 함수 구현 */
+struct thread *get_child_process(int pid)
+{
+	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색*/
+	/* 해당 pid가 존재하면 프로세스 디스크립터 반환 */
+	/* 리스트에 존재하지 않으면 NULL 리턴*/
+}
+
+/* TODO: [2.3] 자식 프로세스 제거 함수 구현 */
+void remove_child_process(struct thread *cp)
+{
+	/* 자식 리스트에서 제거*/
+	/* 프로세스 디스크립터 메모리 해제*/
 }

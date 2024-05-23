@@ -7,12 +7,13 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
-/* NOTE: [Part2] 구현에 필요한 라이브러리 include */
+/* NOTE: [2.2] 구현에 필요한 라이브러리 include */
 #include "include/threads/init.h"
 #include "filesys/filesys.h"
 #include "lib/string.h"
 #include "lib/syscall-nr.h"
 #include "include/threads/malloc.h"
+#include "include/lib/user/syscall.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -30,7 +31,7 @@ void syscall_handler(struct intr_frame *);
 #define MSR_LSTAR 0xc0000082		/* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
-/* NOTE: [Part2] define */
+/* NOTE: [2.2] define */
 #define USER_AREA_STAR 0x8048000
 #define USER_AREA_END 0xc0000000
 
@@ -57,14 +58,8 @@ void syscall_init(void)
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f)
 {
-	// NOTE: [Part2] Your implementation goes here.
-	/* 유저 스택에 저장되어 있는 시스템 콜 넘버를 이용해 시스템 콜 핸들러 구현*/
-	/* 스택 포인터가 유저 영역인지 확인 */
-	/* 저장된 인자 값이 포인터일 경우 유저 영역의 주소인지 확인 */
-	/* 0 : halt */
-	/* 1 : exit */
-	/* . . . */
-
+	// NOTE: [2.2] Your implementation goes here.
+	// TODO: [2.3] exec 시스템 콜 추가
 	void *rsp = f->rsp;
 	check_address(rsp);
 	int syscall_num = *(int *)rsp;
@@ -101,26 +96,28 @@ void syscall_handler(struct intr_frame *f)
 	}
 }
 
-/* NOTE: [Part2] pintos를 종료시키는 시스템 콜 */
+/* ---------- SYSCALL ---------- */
+/* NOTE: [2.2] pintos를 종료시키는 시스템 콜 */
 void halt(void)
 {
 	/* power_off()를 사용하여 pintos 종료 */
 	power_off();
 }
 
-/* NOTE: [Part2] 현재 프로세스를 종료시키는 시스템 콜 */
+/* NOTE: [2.2] 현재 프로세스를 종료시키는 시스템 콜 */
 void exit(int status)
 {
 	/* 실행중인 스레드 구조체를 가져옴 */
 	struct thread *curr = thread_current();
-	/* 프로세스 종료 메시지 출력,
-	출력 양식: “프로세스이름 : exit(종료상태 )” */
+	/* TODO: [2.3] 프로세스 디스크립터에 exit status 저장 */
+
+	/* 프로세스 종료 메시지 출력, 출력 양식: “프로세스이름 : exit(종료상태 )” */
 	printf("%s : exit(%d)\n", curr->name, status);
 	/* 스레드 종료 */
 	thread_exit();
 }
 
-/* NOTE: [Part2] 파일을 생성하는 시스템 콜*/
+/* NOTE: [2.2] 파일을 생성하는 시스템 콜*/
 bool create(const char *file, unsigned initial_size)
 {
 	bool success;
@@ -130,7 +127,7 @@ bool create(const char *file, unsigned initial_size)
 	return success;
 }
 
-/* NOTE: [Part2] 파일을 삭제하는 시스템 콜 */
+/* NOTE: [2.2] 파일을 삭제하는 시스템 콜 */
 bool remove(const char *file)
 {
 	bool success;
@@ -140,7 +137,37 @@ bool remove(const char *file)
 	return success;
 }
 
-/* NOTE: [Part2] 추가 함수 - 주소 값이 유저 영역에서 사용하는 주소 값인지 확인하는 함수 */
+/* TODO: [2.3] exec() 시스템 콜 구현 */
+
+/**
+ * 자식 프로세스를 생성하고 프로그램을 실행시키는 시스템 콜
+ *
+ * 프로세스 생성에 성공 시 생성된 프로세스에 pid 값을 반환, 실패 시-1 반환
+ * 부모 프로세스는 생성된 자식 프로세스의 프로그램이 메모리에 적재 될 때까지 대기
+ * 세마포어를 사용하여 대기
+ * cmd_line: 새로운 프로세스에 실행할 프로그램 명령어
+ * pid_t: int 자료형
+ *
+ * @return pid_t
+ */
+pid_t exec(const *cmd_line)
+{
+	/* process_execute() 함수를 호출하여 자식 프로세스 생성 */
+	/* 생성된 자식 프로세스의 프로세스 디스크립터를 검색 */
+	/* 자식 프로세스의 프로그램이 적재될 때까지 대기*/
+	/* 프로그램 적재 실패 시-1 리턴*/
+	/* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴*/
+}
+
+/* TODO: [2.3] wait() 시스템 콜 구현 */
+int wait(tid_t tid)
+{
+	/* 자식 프로세스가 종료 될 때까지 대기*/
+	/* process_wait()사용 */
+}
+
+/* ---------- UTIL ---------- */
+/* NOTE: [2.2] 추가 함수 - 주소 값이 유저 영역에서 사용하는 주소 값인지 확인하는 함수 */
 void check_address(void *addr)
 {
 	/* 포인터가 가리키는 주소가 유저영역의 주소인지 확인*/
@@ -151,7 +178,7 @@ void check_address(void *addr)
 	}
 }
 
-/* NOTE: [Part2] 추가 함수 - 유저 스택에 있는 인자들을 커널에 저장하는 함수 */
+/* NOTE: [2.2] 추가 함수 - 유저 스택에 있는 인자들을 커널에 저장하는 함수 */
 void get_argument(void *rsp, int *arg, int count)
 {
 	/* 유저 스택에 저장된 인자값들을 커널로 저장*/

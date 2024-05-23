@@ -202,13 +202,19 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	/* And then load the binary */
 	success = load(file_name, &_if);
 
+	/* TODO: [2.3] 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
+
 	/* If load failed, quit. */
 	if (!success)
 	{
 		palloc_free_page(f_name);
+		/* TODO: [2.3] 메모리 적재 실패 시 프로세스 디스크립터에 메모리 적재 실패 */
 		return -1;
 	}
 
+	/* TODO: [2.3] 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
+
+	/* FIXME: 상단으로 이동 */
 	/* NOTE: [2.1] token들을 parse에 저장 */
 	char **parse = malloc(128 * sizeof(char *));
 
@@ -300,9 +306,13 @@ static void argument_stack(char **parse, int count, void **rsp)
  * does nothing. */
 int process_wait(tid_t child_tid UNUSED)
 {
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
+	/* TODO: [2.3] 자식 프로세스가 수행되고 종료될 때까지 부모 프로세스 대기 */
+	/* 자식 프로세스의 프로세스 디스크립터 검색*/
+	/* 예외 처리 발생시-1 리턴*/
+	/* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
+	/* 자식 프로세스 디스크립터 삭제*/
+	/* 자식 프로세스의 exit status 리턴*/
+
 	for (;;)
 	{
 	}
