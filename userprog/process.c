@@ -22,6 +22,7 @@
 #include "lib/string.h"
 #include "lib/stdio.h"
 #include "threads/loader.h"
+#include "filesys/file.h"
 
 #ifdef VM
 #include "vm/vm.h"
@@ -331,15 +332,15 @@ int process_wait(tid_t child_tid)
 void process_exit(void)
 {
 	struct thread *curr = thread_current();
-	/* TODO: Your code goes here.
-	 * TODO: Implement process termination message (see
-	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. */
+	uint32_t *pd;
+	/* TODO: [2.4] 모든 열린 파일 닫기 */
+	/* 프로세스에 열린 모든 파일을 닫음*/
+	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터
+	의 최소값인 2가 될 때까지 파일을 닫음 */
+	/* 파일 디스크립터 테이블 메모리 해제*/
 
 	process_cleanup();
 }
-
-/*  */
 
 /**
  * @brief 현재 프로세스의 자원을 해제하는 함수 /
@@ -382,6 +383,30 @@ void process_activate(struct thread *next)
 
 	/* Set thread's kernel stack for use in processing interrupts. */
 	tss_update(next);
+}
+
+/* ---------- 파일 디스크립터 ---------- */
+
+/* TODO: [2.4] 파일 디스크립터 생성 함수 구현 */
+int process_add_file(struct file *f)
+{
+	/* 파일 객체를 파일 디스크립터 테이블에 추가
+	/* 파일 디스크립터의 최대값 1 증가 */
+	/* 파일 디스크립터 리턴 */
+}
+
+/* TODO: [2.4] 파일 객체 검색 함수 구현 */
+struct file *process_get_file(int fd)
+{
+	/* 파일 디스크립터에 해당하는 파일 객체를 리턴*/
+	/* 없을 시 NULL 리턴 */
+}
+
+/* TODO: [2.4] 파일을 닫는 함수 구현 */
+void process_close_file(int fd)
+{
+	/* 파일 디스크립터에 해당하는 파일을 닫음*/
+	/* 파일 디스크립터 테이블 해당 엔트리 초기화*/
 }
 
 /* We load ELF binaries.  The following definitions are taken

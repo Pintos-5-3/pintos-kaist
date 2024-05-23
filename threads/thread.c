@@ -240,6 +240,10 @@ tid_t thread_create(const char *name, int priority,
 	/* 자식 리스트에 추가 */
 	list_push_back(&thread_current()->child_list, &t->c_elem);
 
+	/* TODO: [2.4] 파일 디스크립터 초기화 */
+	/* fd 값 초기화(0,1은 표준 입력,출력) */
+	/* File Descriptor 테이블에 메모리 할당 */
+
 	/* Add to run queue. */
 	thread_unblock(t);
 

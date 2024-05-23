@@ -56,6 +56,8 @@ void syscall_init(void)
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			  FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+
+	/* TODO: [2.4] filesys_lock 초기화 */
 }
 
 /* The main system call interface */
@@ -157,6 +159,62 @@ int wait(pid_t pid)
 	/* 자식 프로세스가 종료 될 때까지 대기*/
 	/* process_wait()사용 */
 	return process_wait(pid);
+}
+
+/* TODO: [2.4] open() 시스템 콜 구현 */
+int open(const char *file)
+{
+	/* 파일을 open */
+	/* 해당 파일 객체에 파일 디스크립터 부여*/
+	/* 파일 디스크립터 리턴*/
+	/* 해당 파일이 존재하지 않으면-1 리턴 */
+}
+
+/* TODO: [2.4] filesize() 시스템 콜 구현 */
+int filesize(int fd)
+{
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	/* 해당 파일의 길이를 리턴 */
+	/* 해당 파일이 존재하지 않으면-1 리턴 */
+}
+
+/* TODO: [2.4] read() 시스템 콜 구현 */
+int read(int fd, void *buffer, unsigned size)
+{
+	/* 파일에 동시 접근이 일어날 수 있으므로 Lock 사용 */
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	/* 파일 디스크립터가 0일 경우 키보드에 입력을 버퍼에 저장 후 버퍼의 저장한 크기를 리턴 (input_getc() 이용) */
+	/* 파일 디스크립터가 0이 아닐 경우 파일의 데이터를 크기만큼 저장 후 읽은 바이트 수를 리턴 */
+}
+
+/* TODO: [2.4] write() 시스템 콜 구현 */
+int write(int fd, void *buffer, unsigned size)
+{
+	/* 파일에 동시 접근이 일어날 수 있으므로 Lock 사용 */
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	/* 파일 디스크립터가 1일 경우 버퍼에 저장된 값을 화면에 출력 후 버퍼의 크기 리턴 (putbuf() 이용) */
+	/* 파일 디스크립터가 1이 아닐 경우 버퍼에 저장된 데이터를 크기만큼 파일에 기록후 기록한 바이트 수를 리턴 */
+}
+
+/* TODO: [2.4] seek() 시스템 콜 구현 */
+void seek(int fd, unsigned position)
+{
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	/* 해당 열린 파일의 위치(offset)를 position만큼 이동 */
+}
+
+/* TODO: [2.4] tell() 시스템 콜 구현 */
+unsigned tell(int fd)
+{
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	/* 해당 열린 파일의 위치를 반환 */
+}
+
+/* TODO: [2.4] close() 시스템 콜 구현 */
+void close(int fd)
+{
+	/* 해당 파일 디스크립터에 해당하는 파일을 닫음 */
+	/* 파일 디스크립터 엔트리 초기화 */
 }
 
 /* ---------- UTIL ---------- */

@@ -129,6 +129,10 @@ struct thread
 	/* exit 호출 시 종료 status */
 	int exit_status;
 
+	/* TODO: [2.4] 파일 디스크립터 테이블 추가 */
+	/* 파일 디스크립터 테이블 */
+	/* 현재 테이블에 존재하는 fd값의 최대값 + 1 */
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
