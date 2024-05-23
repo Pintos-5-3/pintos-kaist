@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/fixed_point.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -110,15 +111,23 @@ struct thread
 	/* NOTE: [Improve] all_list element */
 	struct list_elem all_elem;
 
-	/* TODO: [2.3] 프로세스 계층 구조 구현을 위한 데이터 추가 */
+	/* NOTE: [2.3] 프로세스 계층 구조 구현을 위한 데이터 추가 */
 	/* 부모 프로세스의 디스크립터 */
+	struct thread *parent;
 	/* 자식 리스트 element */
+	struct list_elem c_elem;
 	/* 자식 리스트 */
+	struct list child_list;
 	/* 프로세스의 프로그램 메모리 적재 유무 */
+	bool is_loaded;
 	/* 프로세스가 종료 유무 확인 */
+	bool is_terminated;
 	/* exit 세마포어 */
+	struct semaphore exit_sema;
 	/* load 세마포어 */
+	struct semaphore load_sema;
 	/* exit 호출 시 종료 status */
+	int exit_status;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
