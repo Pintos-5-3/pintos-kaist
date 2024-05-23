@@ -745,7 +745,6 @@ do_schedule(int status)
 	{
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
-		list_remove(&victim->all_elem); /* NOTE: [Improve] 쓰레드가 죽을 때 all_list에서 제거 */
 
 		/* NOTE: [2.3] 프로세스 디스크립터를 삭제하지 않도록 수정 */
 		// palloc_free_page(victim);
@@ -786,7 +785,9 @@ schedule(void)
 		if (curr && curr->status == THREAD_DYING && curr != initial_thread)
 		{
 			ASSERT(curr != next);
-			list_push_back(&destruction_req, &curr->elem);
+			list_remove(&curr->all_elem); /* NOTE: [Improve] 쓰레드가 죽을 때 all_list에서 제거 */
+
+			// list_push_back(&destruction_req, &curr->elem);
 		}
 
 		/* Before switching the thread, we first save the information
