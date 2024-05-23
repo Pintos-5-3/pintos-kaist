@@ -32,6 +32,7 @@ static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
 static void argument_stack(char **parse, int count, void **rsp);
+char **parse_command(const char *f_name, int *count);
 
 /* General process initializer for initd and other process. */
 static void process_init(void)
@@ -185,8 +186,22 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	char *file_name, *save_ptr;
 	bool success;
 
-	/* NOTE: f_name에서 프로그램 이름 파싱 */
+	/* NOTE: [2.1] f_name 파싱 */
+	char **parse = malloc(128 * sizeof(char *));
 	file_name = strtok_r(f_name, " ", &save_ptr);
+
+	int count = 0;
+	strlcpy(parse, file_name, strlen(file_name) + 1);
+	count++;
+
+	char *token = strtok_r(NULL, " ", &save_ptr);
+	while (token != NULL)
+	{
+		strlcpy(parse + count * sizeof(char *), token, strlen(token) + 1);
+		token = strtok_r(NULL, " ", &save_ptr);
+		count++;
+	}
+	*(parse + count * sizeof(char *)) = NULL;
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -205,40 +220,21 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	/* TODO: [2.3] 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
 
 	/* If load failed, quit. */
+	palloc_free_page(f_name);
 	if (!success)
 	{
-		palloc_free_page(f_name);
 		/* TODO: [2.3] 메모리 적재 실패 시 프로세스 디스크립터에 메모리 적재 실패 */
 		return -1;
 	}
 
-	/* TODO: [2.3] 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
-
-	/* FIXME: 상단으로 이동 */
-	/* NOTE: [2.1] token들을 parse에 저장 */
-	char **parse = malloc(128 * sizeof(char *));
-
-	int count = 0;
-	strlcpy(parse, file_name, strlen(file_name) + 1);
-	count++;
-
-	char *token = strtok_r(NULL, " ", &save_ptr);
-	while (token != NULL)
-	{
-		strlcpy(parse + count * sizeof(char *), token, strlen(token) + 1);
-		token = strtok_r(NULL, " ", &save_ptr);
-		count++;
-	}
-	*(parse + count * sizeof(char *)) = NULL;
-
 	/* NOTE: [2.1] 스택에 인자 push 후 dump로 출력 */
 	argument_stack(parse, count, &_if.rsp);
+	free(parse);
 	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 	memcpy(&_if.R.rsi, _if.rsp + sizeof(void (*)()), sizeof(char *));
 	memcpy(&_if.R.rdi, &count, sizeof(int));
 
-	free(parse);
-	palloc_free_page(f_name);
+	/* TODO: [2.3] 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
 
 	/* Start switched process. */
 	do_iret(&_if);
