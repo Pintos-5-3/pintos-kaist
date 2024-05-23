@@ -238,7 +238,7 @@ tid_t thread_create(const char *name, int priority,
 	/* load 세마포어 0으로 초기화 */
 	sema_init(&t->load_sema, 0);
 	/* 자식 리스트에 추가 */
-	list_insert(&thread_current()->child_list, &t->c_elem);
+	list_push_back(&thread_current()->child_list, &t->c_elem);
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -334,9 +334,11 @@ void thread_exit(void)
 	process_exit();
 #endif
 
-	/* TODO: [2.3] thread_exit 수정 */
-	/* 프로세스 디스크립터에 프로세스 종료를 알림*/
-	/* 부모프로세스의 대기 상태 이탈(세마포어 이용) */
+	/* NOTE: [2.3] thread_exit 수정 */
+	/* 프로세스 디스크립터에 프로세스 종료를 알림 */
+	thread_current()->is_terminated = true;
+	/* 부모 프로세스를 대기 상태에서 이탈시킴 (세마포어 이용) */
+	sema_up(&thread_current()->exit_sema);
 
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
@@ -744,8 +746,9 @@ do_schedule(int status)
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
 		list_remove(&victim->all_elem); /* NOTE: [Improve] 쓰레드가 죽을 때 all_list에서 제거 */
-		/* TODO: [2.3] 프로세스 디스크립터를 삭제하지 않도록 수정 */
-		palloc_free_page(victim);
+
+		/* NOTE: [2.3] 프로세스 디스크립터를 삭제하지 않도록 수정 */
+		// palloc_free_page(victim);
 	}
 	thread_current()->status = status;
 	schedule();
@@ -945,17 +948,33 @@ void thread_all_calc_recent_cpu()
 	}
 }
 
-/* TODO: [2.3] 자식 프로세스 검색 함수 구현 */
-struct thread *get_child_process(int pid)
+/* NOTE: [2.3] 자식 프로세스 검색 함수 구현 */
+struct thread *get_child_process(tid_t tid)
 {
+	struct thread *curr, *child;
+	struct list_elem *e;
+
+	curr = thread_current();
+	ASSERT(curr != NULL);
+
 	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색*/
-	/* 해당 pid가 존재하면 프로세스 디스크립터 반환 */
+	for (e = list_begin(&curr->child_list); e != list_end(&curr->child_list); e = list_next(e))
+	{
+		child = list_entry(e, struct thread, c_elem);
+		/* 해당 pid가 존재하면 프로세스 디스크립터 반환 */
+		if (child->tid == tid)
+			return child;
+	}
+
 	/* 리스트에 존재하지 않으면 NULL 리턴*/
+	return NULL;
 }
 
-/* TODO: [2.3] 자식 프로세스 제거 함수 구현 */
+/* NOTE: [2.3] 자식 프로세스 제거 함수 구현 */
 void remove_child_process(struct thread *cp)
 {
 	/* 자식 리스트에서 제거*/
+	list_remove(&cp->c_elem);
 	/* 프로세스 디스크립터 메모리 해제*/
+	palloc_free_page(cp);
 }

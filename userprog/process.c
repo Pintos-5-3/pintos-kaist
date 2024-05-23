@@ -217,13 +217,15 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	/* And then load the binary */
 	success = load(file_name, &_if);
 
-	/* TODO: [2.3] 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
+	/* NOTE: [2.3] 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
+	sema_up(&thread_current()->load_sema);
 
 	/* If load failed, quit. */
 	palloc_free_page(f_name);
 	if (!success)
 	{
-		/* TODO: [2.3] 메모리 적재 실패 시 프로세스 디스크립터에 메모리 적재 실패 */
+		/* NOTE: [2.3] 메모리 적재 실패 시 프로세스 디스크립터에 메모리 적재 실패 */
+		thread_current()->is_loaded = false;
 		return -1;
 	}
 
@@ -234,7 +236,8 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	memcpy(&_if.R.rsi, _if.rsp + sizeof(void (*)()), sizeof(char *));
 	memcpy(&_if.R.rdi, &count, sizeof(int));
 
-	/* TODO: [2.3] 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
+	/* NOTE: [2.3] 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
+	thread_current()->is_loaded = true;
 
 	/* Start switched process. */
 	do_iret(&_if);
@@ -300,19 +303,28 @@ static void argument_stack(char **parse, int count, void **rsp)
  *
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
-int process_wait(tid_t child_tid UNUSED)
+int process_wait(tid_t child_tid)
 {
-	/* TODO: [2.3] 자식 프로세스가 수행되고 종료될 때까지 부모 프로세스 대기 */
-	/* 자식 프로세스의 프로세스 디스크립터 검색*/
-	/* 예외 처리 발생시-1 리턴*/
-	/* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
-	/* 자식 프로세스 디스크립터 삭제*/
-	/* 자식 프로세스의 exit status 리턴*/
+	/* NOTE: [2.3] 자식 프로세스가 수행되고 종료될 때까지 부모 프로세스 대기 */
+	struct thread *child;
+	int exit_status;
 
-	for (;;)
-	{
-	}
-	return -1;
+	/* 자식 프로세스의 프로세스 디스크립터 검색*/
+	child = get_child_process(child_tid);
+
+	/* 예외 처리 발생 시 -1 리턴 */
+	if (child == NULL)
+		return -1;
+
+	/* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
+	sema_down(&child->exit_sema);
+
+	/* 자식 프로세스 디스크립터 삭제*/
+	exit_status = child->exit_status;
+	remove_child_process(child);
+
+	/* 자식 프로세스의 exit status 리턴*/
+	return exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */

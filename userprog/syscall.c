@@ -8,12 +8,13 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 /* NOTE: [2.2] 구현에 필요한 라이브러리 include */
-#include "include/threads/init.h"
+#include "threads/init.h"
 #include "filesys/filesys.h"
 #include "lib/string.h"
 #include "lib/syscall-nr.h"
-#include "include/threads/malloc.h"
-#include "include/lib/user/syscall.h"
+#include "threads/malloc.h"
+#include "lib/user/syscall.h"
+#include "userprog/process.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -109,7 +110,8 @@ void exit(int status)
 {
 	/* 실행중인 스레드 구조체를 가져옴 */
 	struct thread *curr = thread_current();
-	/* TODO: [2.3] 프로세스 디스크립터에 exit status 저장 */
+	/* NOTE: [2.3] 프로세스 디스크립터에 exit status 저장 */
+	curr->exit_status = status;
 
 	/* 프로세스 종료 메시지 출력, 출력 양식: “프로세스이름 : exit(종료상태 )” */
 	printf("%s : exit(%d)\n", curr->name, status);
@@ -137,33 +139,29 @@ bool remove(const char *file)
 	return success;
 }
 
-/* TODO: [2.3] exec() 시스템 콜 구현 */
-
-/**
- * 자식 프로세스를 생성하고 프로그램을 실행시키는 시스템 콜
- *
- * 프로세스 생성에 성공 시 생성된 프로세스에 pid 값을 반환, 실패 시-1 반환
- * 부모 프로세스는 생성된 자식 프로세스의 프로그램이 메모리에 적재 될 때까지 대기
- * 세마포어를 사용하여 대기
- * cmd_line: 새로운 프로세스에 실행할 프로그램 명령어
- * pid_t: int 자료형
- *
- * @return pid_t
- */
+/* NOTE: [2.3] exec() 시스템 콜 구현 */
 pid_t exec(const char *cmd_line)
 {
-	/* process_execute() 함수를 호출하여 자식 프로세스 생성 */
+	/* process_create_initd() 함수를 호출하여 자식 프로세스 생성 */
+	pid_t child_pid = process_create_initd(cmd_line);
+
 	/* 생성된 자식 프로세스의 프로세스 디스크립터를 검색 */
+	struct thread *child = get_child_process(child_pid);
 	/* 자식 프로세스의 프로그램이 적재될 때까지 대기*/
-	/* 프로그램 적재 실패 시-1 리턴*/
+	sema_down(&child->load_sema);
+	/* 프로그램 적재 실패 시 -1 리턴*/
+	if (!child->is_loaded)
+		return -1;
 	/* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴*/
+	return child_pid;
 }
 
 /* TODO: [2.3] wait() 시스템 콜 구현 */
-int wait(tid_t tid)
+int wait(pid_t pid)
 {
 	/* 자식 프로세스가 종료 될 때까지 대기*/
 	/* process_wait()사용 */
+	return process_wait(pid);
 }
 
 /* ---------- UTIL ---------- */

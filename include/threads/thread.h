@@ -191,4 +191,7 @@ bool compare_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED
 void do_iret(struct intr_frame *tf);
 bool cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
+struct thread *get_child_process(tid_t pid);
+void remove_child_process(struct thread *cp);
+
 #endif /* threads/thread.h */
