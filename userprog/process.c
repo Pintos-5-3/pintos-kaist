@@ -263,14 +263,14 @@ static void argument_stack(char **parse, int count, void **rsp)
 	/* Argument */
 	for (int i = count - 1; i > -1; i--)
 	{
-		len = strlen(parse + i * sizeof(char *)) + 1;
+		len = strlen(parse + i * sizeof(char *)) + 1; // parse[i]
 		*rsp = *rsp - len;
 		memcpy(*rsp, parse + i * sizeof(char *), len);
 		address[i] = *rsp;
 	}
 
 	/* word-align */
-	uint8_t align = (uint8_t)(*rsp) % 8;
+	align = (uint8_t)(*rsp) % 8;
 	if (align != 0)
 	{
 		*rsp = *rsp - align;
