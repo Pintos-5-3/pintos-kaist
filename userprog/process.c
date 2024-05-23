@@ -228,6 +228,8 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	/* NOTE: [Part1] 스택에 인자 push 후 dump로 출력 */
 	argument_stack(parse, count, &_if.rsp);
 	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	memcpy(&_if.R.rsi, _if.rsp + sizeof(void (*)()), sizeof(char *));
+	memcpy(&_if.R.rdi, &count, sizeof(int));
 
 	free(parse);
 	palloc_free_page(f_name);
@@ -248,6 +250,14 @@ static void argument_stack(char **parse, int count, void **rsp)
 {
 	char *address[count + 1];
 	memset(address, NULL, sizeof(address));
+
+	/* word-align */
+	uint8_t align = (uint8_t)(*rsp) % 8;
+	if (align != 0)
+	{
+		*rsp = *rsp - align;
+		memset(*rsp, 0, align);
+	}
 
 	int len;
 	/* Argument */
@@ -272,7 +282,6 @@ static void argument_stack(char **parse, int count, void **rsp)
 	{
 		*rsp = *rsp - sizeof(char *);
 		*(char **)(*rsp) = address[i];
-		printf("%p\n", address[i]);
 	}
 
 	/* fake addreass(0) */
