@@ -186,6 +186,16 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	char *file_name = strtok_r(f_name, " ", &saveptr);
 	bool success;
 
+	char **parse = malloc(128 * sizeof(char *));
+	strlcpy(parse, file_name, strlen(file_name) + 1);
+	int count = 1;
+
+	for (token = strtok_r(NULL, " ", &saveptr); token != NULL; token = strtok_r(NULL, " ", &saveptr))
+	{
+		strlcpy(parse + count * sizeof(char *), token, strlen(token) + 1);
+		count++;
+	}
+
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -202,20 +212,6 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 
 	/* NOTE: [2.3] 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
 	sema_up(&thread_current()->load_sema);
-
-	char **parse = malloc(128 * sizeof(char *));
-	strlcpy(parse, file_name, strlen(file_name) + 1);
-	int count = 1;
-
-	for (token = strtok_r(NULL, " ", &saveptr); token != NULL; token = strtok_r(NULL, " ", &saveptr))
-	{
-		strlcpy(parse + count * sizeof(char *), token, strlen(token) + 1);
-		count++;
-	}
-
-	argument_stack(parse, count, &_if.rsp);
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-	free(parse);
 
 	/* If load failed, quit. */
 	palloc_free_page(f_name);
