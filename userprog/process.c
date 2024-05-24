@@ -180,6 +180,8 @@ process_exec (void *f_name) {
 
 	/* We first kill the current context */
 	process_cleanup ();
+	/* And then load the binary */
+	success = load (file_name, &_if);
 
 	char **parse = malloc(128*sizeof(char *));
 	strlcpy(parse, file_name, strlen(file_name)+1);
@@ -190,18 +192,13 @@ process_exec (void *f_name) {
 		count++;		
 	}
 
-	*(parse+count*sizeof(char *)) = NULL;
-	// strtok_r(NULL, " ", &saveptr);
-
 	argument_stack(parse, count, &_if.rsp);
+
+	// *(parse+count*sizeof(char *)) = NULL;
+	strtok_r(NULL, " ", &saveptr);
+
 	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-
 	free(parse);
-	palloc_free_page(f_name);
-
-
-	/* And then load the binary */
-	success = load (file_name, &_if);
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
