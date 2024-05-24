@@ -136,6 +136,8 @@ struct thread
 	/* 현재 테이블에 존재하는 fd값의 최대값 + 1 */
 	int fd_idx;
 
+	/* TODO: [2.5] 실행 중인 파일 포인터 추가 */
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */

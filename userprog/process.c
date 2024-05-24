@@ -333,6 +333,7 @@ void process_exit(void)
 {
 	struct thread *curr = thread_current();
 	uint32_t *pd;
+	/* TODO: [2.5] 실행 중인 파일 close 하도록 수정 */
 	/* NOTE: [2.4] 모든 열린 파일 닫기 */
 	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터의 최소값인 2가 될 때까지 파일을 닫음 */
 	while (curr->fd_idx > 2)
@@ -516,6 +517,7 @@ load(const char *file_name, struct intr_frame *if_)
 		goto done;
 	process_activate(thread_current());
 
+	/* TODO: [2.5] 파일 open 시 file_deny_write() 호출 / thread 구조체에 실행 중인 파일 추가 */
 	/* Open executable file. */
 	file = filesys_open(file_name);
 	if (file == NULL)

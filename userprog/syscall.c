@@ -75,8 +75,7 @@ void syscall_init(void)
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f UNUSED)
 {
-	// NOTE: [2.2] Your implementation goes here.
-	// NOTE: [2.3] exec 시스템 콜 추가
+	// NOTE: [2.X] Your implementation goes here.
 	uint64_t syscall_num = f->R.rax;
 
 	switch (syscall_num)
@@ -87,6 +86,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	case SYS_EXIT: // 1
 		exit(f->R.rdi);
 		break;
+	/* TODO: [2.5] fork 추가 */
 	case SYS_EXEC: // 3
 		f->R.rax = exec(f->R.rdi);
 		break;
@@ -147,6 +147,9 @@ void exit(int status)
 	/* 스레드 종료 */
 	thread_exit();
 }
+
+/* TODO: [2.5] fork() 시스템 콜 구현 */
+pid_t fork(const char *thread_name) {}
 
 /* NOTE: [2.2] 파일을 생성하는 시스템 콜*/
 bool create(const char *file, unsigned initial_size)
