@@ -333,7 +333,7 @@ void process_exit(void)
 {
 	struct thread *curr = thread_current();
 	uint32_t *pd;
-	/* TODO: [2.5] 실행 중인 파일 close 하도록 수정 */
+
 	/* NOTE: [2.4] 모든 열린 파일 닫기 */
 	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터의 최소값인 2가 될 때까지 파일을 닫음 */
 	while (curr->fd_idx > 2)
@@ -344,6 +344,7 @@ void process_exit(void)
 	}
 	/* 파일 디스크립터 테이블 메모리 해제*/
 	free(curr->fdt);
+
 	process_cleanup();
 }
 
@@ -517,7 +518,6 @@ load(const char *file_name, struct intr_frame *if_)
 		goto done;
 	process_activate(thread_current());
 
-	/* TODO: [2.5] 파일 open 시 file_deny_write() 호출 / thread 구조체에 실행 중인 파일 추가 */
 	/* Open executable file. */
 	file = filesys_open(file_name);
 	if (file == NULL)
@@ -525,6 +525,8 @@ load(const char *file_name, struct intr_frame *if_)
 		printf("load: %s: open failed\n", file_name);
 		goto done;
 	}
+	/* NOTE: [2.5] 파일 open 시 file_deny_write() 호출 / thread 구조체에 실행 중인 파일 추가 */
+	file_deny_write(file);
 
 	/* Read and verify executable header. */
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
