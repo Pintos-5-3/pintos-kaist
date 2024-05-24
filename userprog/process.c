@@ -33,7 +33,6 @@ static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
 static void argument_stack(char **parse, int count, void **rsp);
-char **parse_command(const char *f_name, int *count);
 
 /* General process initializer for initd and other process. */
 static void process_init(void)
@@ -62,11 +61,10 @@ tid_t process_create_initd(const char *file_name) /* NOTE: process_excute() */
 	strlcpy(fn_copy, file_name, PGSIZE);
 
 	/* NOTE: [2.1] program_name 파싱해서 thread_create에 전달 */
-	char *program_name, *save_ptr;
-	program_name = strtok_r(file_name, " ", &save_ptr);
-
+	char *save_ptr;
+	file_name = strtok_r(file_name, " ", &save_ptr);
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create(program_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create(file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page(fn_copy);
 	return tid;
@@ -184,25 +182,9 @@ error:
  */
 int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 {
-	char *file_name, *save_ptr;
+	char *token, *saveptr;
+	char *file_name = strtok_r(f_name, " ", &saveptr);
 	bool success;
-
-	/* NOTE: [2.1] f_name 파싱 */
-	char **parse = malloc(128 * sizeof(char *));
-	file_name = strtok_r(f_name, " ", &save_ptr);
-
-	int count = 0;
-	strlcpy(parse, file_name, strlen(file_name) + 1);
-	count++;
-
-	char *token = strtok_r(NULL, " ", &save_ptr);
-	while (token != NULL)
-	{
-		strlcpy(parse + count * sizeof(char *), token, strlen(token) + 1);
-		token = strtok_r(NULL, " ", &save_ptr);
-		count++;
-	}
-	*(parse + count * sizeof(char *)) = NULL;
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -220,6 +202,20 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 
 	/* NOTE: [2.3] 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
 	sema_up(&thread_current()->load_sema);
+
+	char **parse = malloc(128 * sizeof(char *));
+	strlcpy(parse, file_name, strlen(file_name) + 1);
+	int count = 1;
+
+	for (token = strtok_r(NULL, " ", &saveptr); token != NULL; token = strtok_r(NULL, " ", &saveptr))
+	{
+		strlcpy(parse + count * sizeof(char *), token, strlen(token) + 1);
+		count++;
+	}
+
+	argument_stack(parse, count, &_if.rsp);
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	free(parse);
 
 	/* If load failed, quit. */
 	palloc_free_page(f_name);
@@ -312,7 +308,7 @@ static void argument_stack(char **parse, int count, void **rsp)
  *
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
-int process_wait(tid_t child_tid)
+int process_wait(tid_t child_tid UNUSED)
 {
 	/* NOTE: [2.3] 자식 프로세스가 수행되고 종료될 때까지 부모 프로세스 대기 */
 	struct thread *child;
@@ -517,6 +513,7 @@ load(const char *file_name, struct intr_frame *if_)
 	bool success = false;
 	int i;
 
+	// hex_dump(&file_ofs, )
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create();
 	if (t->pml4 == NULL)
