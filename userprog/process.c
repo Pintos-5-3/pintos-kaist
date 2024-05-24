@@ -27,6 +27,8 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
+static void argument_stack(char **parse, int count, void **rsp);
+
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -50,6 +52,8 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	char *save_ptr;
+	file_name = strtok_r(file_name, " ", &save_ptr);
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
@@ -162,7 +166,8 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	char *file_name = f_name;
+	char *token, *saveptr;
+	char *file_name = strtok_r(f_name, " ", &saveptr);
 	bool success;
 
 	/* We cannot use the intr_frame in the thread structure.
@@ -175,9 +180,25 @@ process_exec (void *f_name) {
 
 	/* We first kill the current context */
 	process_cleanup ();
-
 	/* And then load the binary */
 	success = load (file_name, &_if);
+
+	char **parse = malloc(128*sizeof(char *));
+	strlcpy(parse, file_name, strlen(file_name)+1);
+	int count =1;
+
+	for (token = strtok_r(NULL, " ", &saveptr); token != NULL; token = strtok_r(NULL, " ", &saveptr)) {
+		strlcpy(parse + count*sizeof(char *), token, strlen(token)+1);
+		count++;		
+	}
+
+	argument_stack(parse, count, &_if.rsp);
+
+	// *(parse+count*sizeof(char *)) = NULL;
+	strtok_r(NULL, " ", &saveptr);
+
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	free(parse);
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -189,6 +210,41 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
+static void argument_stack(char **parse, int count, void **rsp)
+{
+	char *address[count + 1];
+	memset(address, NULL, sizeof(address));
+
+	int len;
+	/* Argument */
+	for (int i = count - 1; i > -1; i--)
+	{
+		len = strlen(parse + i * sizeof(char *)) + 1;
+		*rsp = *rsp - len;
+		memcpy(*rsp, parse + i * sizeof(char *), len);
+		address[i] = *rsp;
+	}
+
+	/* word-align */
+	uint8_t align = (uint8_t)(*rsp) % 8;
+	if (align != 0)
+	{
+		*rsp = *rsp - align;
+		memset(*rsp, 0, align);
+	}
+
+	/* Argument의 주소 */
+	for (int i = count; i > -1; i--)
+	{
+		*rsp = *rsp - sizeof(char *);
+		*(char **)(*rsp) = address[i];
+		printf("%p\n", address[i]);
+	}
+
+	/* fake addreass(0) */
+	*rsp = *rsp - sizeof(void (*)());
+	*(void (**)())(*rsp) = 0;
+}
 
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
@@ -204,6 +260,11 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	while (true)
+	{
+		/* code */
+	}
+	
 	return -1;
 }
 
@@ -329,6 +390,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	// hex_dump(&file_ofs, )
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
