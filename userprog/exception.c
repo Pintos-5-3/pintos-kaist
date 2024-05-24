@@ -142,7 +142,8 @@ page_fault(struct intr_frame *f)
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
 
-	/* TODO: [2.4] 페이지 폴트 발생 시 exit(-1) 호출 */
+	/* NOTE: [2.4] 페이지 폴트 발생 시 exit(-1) 호출 */
+	exit(-1);
 
 #ifdef VM
 	/* For project 3 and later. */

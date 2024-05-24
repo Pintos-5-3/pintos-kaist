@@ -233,9 +233,9 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	/* NOTE: [2.1] 스택에 인자 push 후 dump로 출력 */
 	argument_stack(parse, count, &_if.rsp);
 	free(parse);
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-	memcpy(&_if.R.rsi, _if.rsp + sizeof(void (*)()), sizeof(char *));
-	memcpy(&_if.R.rdi, &count, sizeof(int));
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	_if.R.rsi = _if.rsp + sizeof(void (*)());
+	_if.R.rdi = count;
 
 	/* NOTE: [2.3] 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
 	thread_current()->is_loaded = true;
@@ -293,6 +293,14 @@ static void argument_stack(char **parse, int count, void **rsp)
 	/* fake addreass(0) */
 	*rsp = *rsp - sizeof(void (*)());
 	*(void (**)())(*rsp) = 0;
+
+	/* word-align */
+	align = (uint8_t)(*rsp) % 8;
+	if (align != 0)
+	{
+		*rsp = *rsp - align;
+		memset(*rsp, 0, align);
+	}
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -333,12 +341,16 @@ void process_exit(void)
 {
 	struct thread *curr = thread_current();
 	uint32_t *pd;
-	/* TODO: [2.4] 모든 열린 파일 닫기 */
-	/* 프로세스에 열린 모든 파일을 닫음*/
-	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터
-	의 최소값인 2가 될 때까지 파일을 닫음 */
+	/* NOTE: [2.4] 모든 열린 파일 닫기 */
+	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터의 최소값인 2가 될 때까지 파일을 닫음 */
+	while (curr->fd_idx > 2)
+	{
+		if (curr->fdt[curr->fd_idx - 1] != NULL)
+			file_close(curr->fdt[curr->fd_idx - 1]);
+		curr->fd_idx -= 1;
+	}
 	/* 파일 디스크립터 테이블 메모리 해제*/
-
+	free(curr->fdt);
 	process_cleanup();
 }
 
@@ -387,26 +399,47 @@ void process_activate(struct thread *next)
 
 /* ---------- 파일 디스크립터 ---------- */
 
-/* TODO: [2.4] 파일 디스크립터 생성 함수 구현 */
+/* NOTE: [2.4] 파일 디스크립터 생성 함수 구현 */
 int process_add_file(struct file *f)
 {
-	/* 파일 객체를 파일 디스크립터 테이블에 추가
+	struct thread *curr = thread_current();
+	/* 파일 객체를 파일 디스크립터 테이블에 추가 */
+	curr->fdt[curr->fd_idx] = f;
 	/* 파일 디스크립터의 최대값 1 증가 */
+	curr->fd_idx += 1;
 	/* 파일 디스크립터 리턴 */
+	return curr->fd_idx;
 }
 
-/* TODO: [2.4] 파일 객체 검색 함수 구현 */
+/* NOTE: [2.4] 파일 객체 검색 함수 구현 */
 struct file *process_get_file(int fd)
 {
 	/* 파일 디스크립터에 해당하는 파일 객체를 리턴*/
+	struct file *f = thread_current()->fdt[fd];
+	if (f != NULL)
+		return f;
 	/* 없을 시 NULL 리턴 */
+	return NULL;
 }
 
-/* TODO: [2.4] 파일을 닫는 함수 구현 */
+/* NOTE: [2.4] 파일을 닫는 함수 구현 */
 void process_close_file(int fd)
 {
+	struct thread *curr = thread_current();
+	struct file *file = process_get_file(fd);
+	if (file == NULL)
+		return;
 	/* 파일 디스크립터에 해당하는 파일을 닫음*/
+	file_close(file);
 	/* 파일 디스크립터 테이블 해당 엔트리 초기화*/
+	curr->fdt[fd] = NULL;
+
+	/* 삭제하는 fd가 fd_idx와 같을 경우, fd_idx 갱신 */
+	if (curr->fd_idx == fd)
+	{
+		while (curr->fdt[curr->fd_idx] == NULL && curr->fd_idx > 2)
+			curr->fd_idx -= 1;
+	}
 }
 
 /* We load ELF binaries.  The following definitions are taken

@@ -12,6 +12,7 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #include "threads/fixed_point.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -240,9 +241,13 @@ tid_t thread_create(const char *name, int priority,
 	/* 자식 리스트에 추가 */
 	list_push_back(&thread_current()->child_list, &t->c_elem);
 
-	/* TODO: [2.4] 파일 디스크립터 초기화 */
+	/* NOTE: [2.4] 파일 디스크립터 초기화 */
 	/* fd 값 초기화(0,1은 표준 입력,출력) */
+	t->fd_idx = 2;
 	/* File Descriptor 테이블에 메모리 할당 */
+	t->fdt = calloc(NOFILE, sizeof(struct file *));
+	t->fdt[0] = 0;
+	t->fdt[1] = 1;
 
 	/* Add to run queue. */
 	thread_unblock(t);

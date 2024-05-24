@@ -3,6 +3,7 @@
 
 void syscall_init(void);
 
-/* TODO: [2.4] File에 대한 동시 접근을 막기 위한 filesys_lock 추가 */
+/* NOTE: [2.4] File에 대한 동시 접근을 막기 위한 filesys_lock 추가 */
+struct lock filesys_lock;
 
 #endif /* userprog/syscall.h */

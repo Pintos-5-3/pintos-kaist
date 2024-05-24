@@ -7,6 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/fixed_point.h"
 #include "threads/synch.h"
+#include "filesys/file.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -129,9 +130,11 @@ struct thread
 	/* exit 호출 시 종료 status */
 	int exit_status;
 
-	/* TODO: [2.4] 파일 디스크립터 테이블 추가 */
+	/* NOTE: [2.4] 파일 디스크립터 테이블 추가 */
 	/* 파일 디스크립터 테이블 */
+	struct file **fdt;
 	/* 현재 테이블에 존재하는 fd값의 최대값 + 1 */
+	int fd_idx;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

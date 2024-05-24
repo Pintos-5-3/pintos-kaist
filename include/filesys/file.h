@@ -1,5 +1,6 @@
 #ifndef FILESYS_FILE_H
 #define FILESYS_FILE_H
+#define NOFILE 128
 
 #include "filesys/off_t.h"
 
