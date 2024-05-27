@@ -88,9 +88,16 @@ initd(void *f_name)
  * TID_ERROR if the thread cannot be created. */
 tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
 {
+	struct thread *curr = thread_current();
+	memcpy(&curr->parent_if, if_, sizeof(struct intr_frame));
+
 	/* Clone current thread to new thread.*/
-	return thread_create(name,
-						 PRI_DEFAULT, __do_fork, thread_current());
+	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, curr);
+	if (tid == TID_ERROR)
+		return TID_ERROR;
+	struct thread *child = get_child_process(tid);
+	sema_down(&child->load_sema);
+	return tid;
 }
 
 #ifndef VM
@@ -137,12 +144,14 @@ __do_fork(void *aux)
 	struct intr_frame if_;
 	struct thread *parent = (struct thread *)aux;
 	struct thread *current = thread_current();
-	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	/* NOTE: somehow pass the parent_if. (i.e. process_fork()'s if_) */
+	struct intr_frame *parent_if = &parent->parent_if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy(&if_, parent_if, sizeof(struct intr_frame));
+	/* NOTE: [2.5] 자식 프로세스의 리턴값을 0으로 지정 */
+	if_.R.rax = 0;
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();

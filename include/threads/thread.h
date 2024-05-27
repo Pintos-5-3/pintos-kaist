@@ -139,6 +139,9 @@ struct thread
 	/* NOTE: [2.5] 실행 중인 파일 포인터 추가 */
 	struct file *run_file;
 
+	/* NOTE: [2.5] fork를 위한 if 구조체 */
+	struct intr_frame parent_if;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
