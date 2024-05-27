@@ -148,8 +148,28 @@ void exit(int status)
 	thread_exit();
 }
 
-/* TODO: [2.5] fork() 시스템 콜 구현 */
-pid_t fork(const char *thread_name) {}
+
+/* NOTE: [2.3] exec() 시스템 콜 구현 */
+pid_t exec(const char *cmd_line)
+{
+	check_address(cmd_line);
+
+	char *cmd_line_cpy = palloc_get_page(0);
+	if (cmd_line_cpy == NULL)
+		exit(-1);
+	strlcpy(cmd_line_cpy, cmd_line, PGSIZE);
+
+	if (process_exec(cmd_line_cpy) == -1)
+		exit(-1);
+}
+
+/* NOTE: [2.3] wait() 시스템 콜 구현 */
+int wait(pid_t pid)
+{
+	/* 자식 프로세스가 종료 될 때까지 대기*/
+	/* process_wait() 사용 */
+	return process_wait(pid);
+}
 
 /* NOTE: [2.2] 파일을 생성하는 시스템 콜*/
 bool create(const char *file, unsigned initial_size)
@@ -175,40 +195,13 @@ bool remove(const char *file)
 	return success;
 }
 
-/* NOTE: [2.3] exec() 시스템 콜 구현 */
-pid_t exec(const char *cmd_line)
-{
-	check_address(cmd_line);
-
-	/* process_create_initd() 함수를 호출하여 자식 프로세스 생성 */
-	pid_t child_pid = process_create_initd(cmd_line);
-
-	/* 생성된 자식 프로세스의 프로세스 디스크립터를 검색 */
-	struct thread *child = get_child_process(child_pid);
-	/* 자식 프로세스의 프로그램이 적재될 때까지 대기*/
-	sema_down(&child->load_sema);
-	/* 프로그램 적재 실패 시 -1 리턴*/
-	if (!child->is_loaded)
-		return -1;
-	/* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴*/
-	return child_pid;
-}
-
-/* NOTE: [2.3] wait() 시스템 콜 구현 */
-int wait(pid_t pid)
-{
-	/* 자식 프로세스가 종료 될 때까지 대기*/
-	/* process_wait() 사용 */
-	return process_wait(pid);
-}
-
 /* NOTE: [2.4] open() 시스템 콜 구현 */
 int open(const char *file_name)
 {
 	check_address(file_name);
 
 	/* 파일을 open */
-	struct file *file = file_open(file_name);
+	struct file *file = filesys_open(file_name);
 
 	/* 해당 파일 객체에 파일 디스크립터 부여*/
 	/* 파일 디스크립터 리턴*/
