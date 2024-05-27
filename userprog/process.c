@@ -371,6 +371,7 @@ void process_exit(void)
 		if (file != NULL)
 			file_close(file);
 	}
+	palloc_free_multiple(curr->fdt, FDT_MAX);
 	process_cleanup();
 
 	/* NOTE: [2.3] thread_exit 수정 */

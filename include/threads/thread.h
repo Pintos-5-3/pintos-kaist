@@ -131,7 +131,7 @@ struct thread
 
 	/* NOTE: [2.4] 파일 디스크립터 테이블 추가 */
 	/* 파일 디스크립터 테이블 */
-	struct file *fdt[FDT_MAX];
+	struct file **fdt;
 	/* 현재 테이블에 존재하는 fd값의 최대값 + 1 */
 	int fd_idx;
 

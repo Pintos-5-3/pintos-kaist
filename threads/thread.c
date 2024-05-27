@@ -243,7 +243,7 @@ tid_t thread_create(const char *name, int priority,
 	/* fd 값 초기화(0,1은 표준 입력,출력) */
 	t->fd_idx = 2;
 	/* File Descriptor 테이블에 메모리 할당 */
-	// t->fdt = calloc(FDT_MAX, sizeof(struct file *));
+	t->fdt = palloc_get_multiple(PAL_ZERO, FDT_MAX);
 	t->fdt[0] = 0;
 	t->fdt[1] = 1;
 
