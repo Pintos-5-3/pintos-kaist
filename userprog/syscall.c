@@ -16,6 +16,7 @@
 #include "lib/user/syscall.h"
 #include "userprog/process.h"
 #include "devices/input.h"
+#include "threads/palloc.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -41,6 +42,7 @@ void syscall_handler(struct intr_frame *);
 void halt(void);
 void exit(int status);
 pid_t exec(const char *cmd_line);
+pid_t sys_fork(const char *thread_name, struct intr_frame *f);
 int wait(pid_t pid);
 int open(const char *file_name);
 int filesize(int fd);
@@ -73,9 +75,10 @@ void syscall_init(void)
 }
 
 /* The main system call interface */
-void syscall_handler(struct intr_frame *f UNUSED)
+void syscall_handler(struct intr_frame *f)
 {
 	// NOTE: [2.X] Your implementation goes here.
+	/* TODO: [2.5] fork 추가 */
 	uint64_t syscall_num = f->R.rax;
 
 	switch (syscall_num)
@@ -86,7 +89,9 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	case SYS_EXIT: // 1
 		exit(f->R.rdi);
 		break;
-	/* TODO: [2.5] fork 추가 */
+	case SYS_FORK: // 2
+		f->R.rax = sys_fork(f->R.rdi, f);
+		break;
 	case SYS_EXEC: // 3
 		f->R.rax = exec(f->R.rdi);
 		break;
@@ -148,6 +153,12 @@ void exit(int status)
 	thread_exit();
 }
 
+/* NOTE: [2.5] fork() 시스템 콜 구현 */
+pid_t sys_fork(const char *thread_name, struct intr_frame *f)
+{
+	check_address(thread_name);
+	return process_fork(thread_name, f);
+}
 
 /* NOTE: [2.3] exec() 시스템 콜 구현 */
 pid_t exec(const char *cmd_line)

@@ -103,8 +103,9 @@ tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
 #ifndef VM
 /* Duplicate the parent's address space by passing this function to the
  * pml4_for_each. This is only for the project 2. */
-static bool
-duplicate_pte(uint64_t *pte, void *va, void *aux)
+
+/* NOTE: [2.5] 전체 사용자 메모리 공간을 복사하는 함수에서 빠진 부분 구현 */
+static bool duplicate_pte(uint64_t *pte, void *va, void *aux)
 {
 	struct thread *current = thread_current();
 	struct thread *parent = (struct thread *)aux;
@@ -112,23 +113,30 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
 	void *newpage;
 	bool writable;
 
-	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	/* 1. NOTE: If the parent_page is kernel page, then return immediately. */
+	if (is_kernel_vaddr(va))
+		return true;
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page(parent->pml4, va);
+	if (parent_page == NULL)
+		return false;
 
-	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
-	 *    TODO: NEWPAGE. */
+	/* 3. NOTE: Allocate new PAL_USER page for the child and set result to NEWPAGE. */
+	newpage = palloc_get_page(PAL_USER | PAL_ZERO);
+	if (newpage == NULL)
+		return false;
 
-	/* 4. TODO: Duplicate parent's page to the new page and
-	 *    TODO: check whether parent's page is writable or not (set WRITABLE
-	 *    TODO: according to the result). */
+	/* 4. NOTE: Duplicate parent's page to the new page and check whether parent's page is writable or not (set WRITABLE according to the result). */
+	memcpy(newpage, parent_page, PGSIZE);
+	writable = is_writable(pte);
 
-	/* 5. Add new page to child's page table at address VA with WRITABLE
-	 *    permission. */
+	/* 5. Add new page to child's page table at address VA with WRITABLE permission. */
 	if (!pml4_set_page(current->pml4, va, newpage, writable))
 	{
-		/* 6. TODO: if fail to insert page, do error handling. */
+		/* 6. NOTE: if fail to insert page, do error handling. */
+		palloc_free_page(newpage);
+		return false;
 	}
 	return true;
 }
@@ -167,13 +175,22 @@ __do_fork(void *aux)
 	if (!pml4_for_each(parent->pml4, duplicate_pte, parent))
 		goto error;
 #endif
-
-	/* TODO: Your code goes here.
-	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
-	 * TODO:       in include/filesys/file.h. Note that parent should not return
-	 * TODO:       from the fork() until this function successfully duplicates
-	 * TODO:       the resources of parent.*/
-
+	/* NOTE: Your code goes here.
+	 * NOTE: Hint) To duplicate the file object, use `file_duplicate`
+	 * NOTE:       in include/filesys/file.h. Note that parent should not return
+	 * NOTE:       from the fork() until this function successfully duplicates
+	 * NOTE:       the resources of parent.*/
+	for (int i = 2; i < NOFILE; i++)
+	{
+		struct file *file = parent->fdt[i];
+		if (file != NULL)
+		{
+			struct file *new_file = file_duplicate(file);
+			current->fdt[i] = new_file;
+		}
+	}
+	current->fd_idx = parent->fd_idx;
+	sema_up(&current->load_sema);
 	process_init();
 
 	/* Finally, switch to the newly created process. */
@@ -220,7 +237,7 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	success = load(file_name, &_if);
 
 	/* NOTE: [2.3] 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
-	sema_up(&thread_current()->load_sema);
+	// sema_up(&thread_current()->load_sema);
 
 	/* If load failed, quit. */
 	palloc_free_page(f_name);
@@ -313,7 +330,7 @@ static void argument_stack(char **parse, int count, void **rsp)
  *
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
-int process_wait(tid_t child_tid UNUSED)
+int process_wait(tid_t child_tid)
 {
 	/* NOTE: [2.3] 자식 프로세스가 수행되고 종료될 때까지 부모 프로세스 대기 */
 	struct thread *child;
@@ -342,6 +359,10 @@ void process_exit(void)
 {
 	struct thread *curr = thread_current();
 	uint32_t *pd;
+
+	/* NOTE: [2.5] run_file 닫아주기 */
+	if (curr->run_file)
+		file_close(curr->run_file);
 
 	/* NOTE: [2.4] 모든 열린 파일 닫기 */
 	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터의 최소값인 2가 될 때까지 파일을 닫음 */
@@ -418,7 +439,7 @@ int process_add_file(struct file *f)
 struct file *process_get_file(int fd)
 {
 	/* 파일 디스크립터에 해당하는 파일 객체를 리턴*/
-	struct file *f = thread_current()->fdt[fd];
+	struct file *f = thread_current()->fdt[fd - 1];
 	if (f != NULL)
 		return f;
 	/* 없을 시 NULL 리턴 */
@@ -435,7 +456,7 @@ void process_close_file(int fd)
 	/* 파일 디스크립터에 해당하는 파일을 닫음*/
 	file_close(file);
 	/* 파일 디스크립터 테이블 해당 엔트리 초기화*/
-	curr->fdt[fd] = NULL;
+	curr->fdt[fd - 1] = NULL;
 
 	/* 삭제하는 fd가 fd_idx와 같을 경우, fd_idx 갱신 */
 	if (curr->fd_idx == fd)
@@ -536,6 +557,7 @@ load(const char *file_name, struct intr_frame *if_)
 	}
 	/* NOTE: [2.5] 파일 open 시 file_deny_write() 호출 / thread 구조체에 실행 중인 파일 추가 */
 	file_deny_write(file);
+	thread_current()->run_file = file;
 
 	/* Read and verify executable header. */
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
@@ -610,14 +632,11 @@ load(const char *file_name, struct intr_frame *if_)
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-
 	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close(file);
+	// file_close(file);
 	return success;
 }
 
