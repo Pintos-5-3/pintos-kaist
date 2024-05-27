@@ -230,14 +230,12 @@ tid_t thread_create(const char *name, int priority,
 	/* NOTE: [2.3] 자료구조 초기화 */
 	/* 부모 프로세스 저장 */
 	t->parent = thread_current();
-	/* 프로그램이 로드되지 않음 */
-	t->is_loaded = false;
-	/* 프로세스가 종료되지 않음 */
-	t->is_terminated = false;
 	/* exit 세마포어 0으로 초기화 */
 	sema_init(&t->exit_sema, 0);
 	/* load 세마포어 0으로 초기화 */
 	sema_init(&t->load_sema, 0);
+	/* wait 세마포어 0으로 초기화 */
+	sema_init(&t->wait_sema, 0);
 	/* 자식 리스트에 추가 */
 	list_push_back(&thread_current()->child_list, &t->c_elem);
 
@@ -245,7 +243,7 @@ tid_t thread_create(const char *name, int priority,
 	/* fd 값 초기화(0,1은 표준 입력,출력) */
 	t->fd_idx = 2;
 	/* File Descriptor 테이블에 메모리 할당 */
-	t->fdt = calloc(NOFILE, sizeof(struct file *));
+	// t->fdt = calloc(FDT_MAX, sizeof(struct file *));
 	t->fdt[0] = 0;
 	t->fdt[1] = 1;
 
@@ -342,13 +340,6 @@ void thread_exit(void)
 #ifdef USERPROG
 	process_exit();
 #endif
-
-	/* NOTE: [2.3] thread_exit 수정 */
-	/* 프로세스 디스크립터에 프로세스 종료를 알림 */
-	thread_current()->is_terminated = true;
-	/* 부모 프로세스를 대기 상태에서 이탈시킴 (세마포어 이용) */
-	sema_up(&thread_current()->exit_sema);
-
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable();
@@ -754,7 +745,6 @@ do_schedule(int status)
 	{
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
-
 		/* NOTE: [2.3] 프로세스 디스크립터를 삭제하지 않도록 수정 */
 		// palloc_free_page(victim);
 	}
@@ -965,7 +955,6 @@ struct thread *get_child_process(tid_t tid)
 	struct list_elem *e;
 
 	curr = thread_current();
-	ASSERT(curr != NULL);
 
 	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색*/
 	for (e = list_begin(&curr->child_list); e != list_end(&curr->child_list); e = list_next(e))
@@ -978,13 +967,4 @@ struct thread *get_child_process(tid_t tid)
 
 	/* 리스트에 존재하지 않으면 NULL 리턴*/
 	return NULL;
-}
-
-/* NOTE: [2.3] 자식 프로세스 제거 함수 구현 */
-void remove_child_process(struct thread *cp)
-{
-	/* 자식 리스트에서 제거*/
-	list_remove(&cp->c_elem);
-	/* 프로세스 디스크립터 메모리 해제*/
-	palloc_free_page(cp);
 }

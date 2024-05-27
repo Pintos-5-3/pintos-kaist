@@ -1,6 +1,6 @@
 #ifndef FILESYS_FILE_H
 #define FILESYS_FILE_H
-#define NOFILE 64
+#define FDT_MAX 64
 
 #include "filesys/off_t.h"
 

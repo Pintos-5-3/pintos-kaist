@@ -23,6 +23,7 @@
 #include "lib/stdio.h"
 #include "threads/loader.h"
 #include "filesys/file.h"
+#include "threads/malloc.h"
 
 #ifdef VM
 #include "vm/vm.h"
@@ -86,7 +87,7 @@ initd(void *f_name)
 
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
-tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
+tid_t process_fork(const char *name, struct intr_frame *if_)
 {
 	struct thread *curr = thread_current();
 	memcpy(&curr->parent_if, if_, sizeof(struct intr_frame));
@@ -180,7 +181,12 @@ __do_fork(void *aux)
 	 * NOTE:       in include/filesys/file.h. Note that parent should not return
 	 * NOTE:       from the fork() until this function successfully duplicates
 	 * NOTE:       the resources of parent.*/
-	for (int i = 2; i < NOFILE; i++)
+
+	/* FIXME: 왜 해줘야하는거지? */
+	if (parent->fd_idx == FDT_MAX)
+		goto error;
+
+	for (int i = 2; i < FDT_MAX; i++)
 	{
 		struct file *file = parent->fdt[i];
 		if (file != NULL)
@@ -197,7 +203,8 @@ __do_fork(void *aux)
 	if (succ)
 		do_iret(&if_);
 error:
-	thread_exit();
+	sema_up(&current->load_sema);
+	exit(-1);
 }
 
 /**
@@ -242,11 +249,7 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	/* If load failed, quit. */
 	palloc_free_page(f_name);
 	if (!success)
-	{
-		/* NOTE: [2.3] 메모리 적재 실패 시 프로세스 디스크립터에 메모리 적재 실패 */
-		thread_current()->is_loaded = false;
 		return -1;
-	}
 
 	/* NOTE: [2.1] 스택에 인자 push 후 dump로 출력 */
 	argument_stack(parse, count, &_if.rsp);
@@ -254,9 +257,6 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 	_if.R.rsi = _if.rsp + sizeof(void (*)());
 	_if.R.rdi = count;
-
-	/* NOTE: [2.3] 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
-	thread_current()->is_loaded = true;
 
 	/* Start switched process. */
 	do_iret(&_if);
@@ -344,12 +344,13 @@ int process_wait(tid_t child_tid)
 		return -1;
 
 	/* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
-	sema_down(&child->exit_sema);
+	sema_down(&child->wait_sema);
 
 	/* 자식 프로세스 디스크립터 삭제*/
 	exit_status = child->exit_status;
-	remove_child_process(child);
+	list_remove(&child->c_elem);
 
+	sema_up(&child->exit_sema);
 	/* 자식 프로세스의 exit status 리턴*/
 	return exit_status;
 }
@@ -358,24 +359,24 @@ int process_wait(tid_t child_tid)
 void process_exit(void)
 {
 	struct thread *curr = thread_current();
-	uint32_t *pd;
 
 	/* NOTE: [2.5] run_file 닫아주기 */
 	if (curr->run_file)
 		file_close(curr->run_file);
 
 	/* NOTE: [2.4] 모든 열린 파일 닫기 */
-	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터의 최소값인 2가 될 때까지 파일을 닫음 */
-	while (curr->fd_idx > 2)
+	for (int idx = 2; idx < FDT_MAX; idx++)
 	{
-		if (curr->fdt[curr->fd_idx - 1] != NULL)
-			file_close(curr->fdt[curr->fd_idx - 1]);
-		curr->fd_idx -= 1;
+		struct file *file = process_get_file(idx);
+		if (file != NULL)
+			file_close(file);
 	}
-	/* 파일 디스크립터 테이블 메모리 해제*/
-	free(curr->fdt);
-
 	process_cleanup();
+
+	/* NOTE: [2.3] thread_exit 수정 */
+	/* 부모 프로세스를 대기 상태에서 이탈시킴 (세마포어 이용) */
+	sema_up(&thread_current()->wait_sema);
+	sema_down(&thread_current()->exit_sema);
 }
 
 /**
@@ -427,43 +428,53 @@ void process_activate(struct thread *next)
 int process_add_file(struct file *f)
 {
 	struct thread *curr = thread_current();
-	/* 파일 객체를 파일 디스크립터 테이블에 추가 */
-	curr->fdt[curr->fd_idx] = f;
-	/* 파일 디스크립터의 최대값 1 증가 */
-	curr->fd_idx += 1;
-	/* 파일 디스크립터 리턴 */
-	return curr->fd_idx;
+
+	for (int idx = curr->fd_idx; idx < FDT_MAX; idx++)
+	{
+		if (curr->fdt[idx] == NULL)
+		{
+			curr->fdt[idx] = f;
+			curr->fd_idx = idx + 1;
+			/* 파일 디스크립터 리턴 */
+			return idx;
+		}
+	}
+
+	curr->fd_idx = FDT_MAX;
+	return -1;
 }
 
 /* NOTE: [2.4] 파일 객체 검색 함수 구현 */
 struct file *process_get_file(int fd)
 {
+	/* fd 범위 체크 */
+	if (fd < 0 || fd >= FDT_MAX)
+		return NULL;
 	/* 파일 디스크립터에 해당하는 파일 객체를 리턴*/
-	struct file *f = thread_current()->fdt[fd - 1];
-	if (f != NULL)
-		return f;
-	/* 없을 시 NULL 리턴 */
-	return NULL;
+	struct file *f = thread_current()->fdt[fd];
+	return f;
 }
 
 /* NOTE: [2.4] 파일을 닫는 함수 구현 */
 void process_close_file(int fd)
 {
+	/* fd 범위 체크 */
+	if (fd < 0 || fd >= FDT_MAX)
+		return;
+
 	struct thread *curr = thread_current();
 	struct file *file = process_get_file(fd);
 	if (file == NULL)
 		return;
+
 	/* 파일 디스크립터에 해당하는 파일을 닫음*/
 	file_close(file);
 	/* 파일 디스크립터 테이블 해당 엔트리 초기화*/
-	curr->fdt[fd - 1] = NULL;
+	curr->fdt[fd] = NULL;
 
-	/* 삭제하는 fd가 fd_idx와 같을 경우, fd_idx 갱신 */
-	if (curr->fd_idx == fd)
-	{
-		while (curr->fdt[curr->fd_idx] == NULL && curr->fd_idx > 2)
-			curr->fd_idx -= 1;
-	}
+	/* FIXME: 삭제하는 fd가 fd_idx보다 작은 경우, fd_idx 갱신 */
+	if (fd < curr->fd_idx)
+		curr->fd_idx = fd;
 }
 
 /* We load ELF binaries.  The following definitions are taken

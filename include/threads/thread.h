@@ -119,20 +119,19 @@ struct thread
 	struct list_elem c_elem;
 	/* 자식 리스트 */
 	struct list child_list;
-	/* 프로세스의 프로그램 메모리 적재 유무 */
-	bool is_loaded;
-	/* 프로세스가 종료 유무 확인 */
-	bool is_terminated;
 	/* exit 세마포어 */
 	struct semaphore exit_sema;
 	/* load 세마포어 */
 	struct semaphore load_sema;
+	/* wait 세마포어 */
+	struct semaphore wait_sema;
+
 	/* exit 호출 시 종료 status */
 	int exit_status;
 
 	/* NOTE: [2.4] 파일 디스크립터 테이블 추가 */
 	/* 파일 디스크립터 테이블 */
-	struct file **fdt;
+	struct file *fdt[FDT_MAX];
 	/* 현재 테이블에 존재하는 fd값의 최대값 + 1 */
 	int fd_idx;
 
@@ -205,6 +204,5 @@ void do_iret(struct intr_frame *tf);
 bool cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
 
 struct thread *get_child_process(tid_t pid);
-void remove_child_process(struct thread *cp);
 
 #endif /* threads/thread.h */
