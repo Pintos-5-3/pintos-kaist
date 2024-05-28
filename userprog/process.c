@@ -24,6 +24,7 @@
 #include "threads/loader.h"
 #include "filesys/file.h"
 #include "threads/malloc.h"
+#include "userprog/syscall.h"
 
 #ifdef VM
 #include "vm/vm.h"
@@ -240,8 +241,10 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	/* We first kill the current context */
 	process_cleanup();
 
+	lock_acquire(&filesys_lock);
 	/* And then load the binary */
 	success = load(file_name, &_if);
+	lock_release(&filesys_lock);
 
 	/* NOTE: [2.3] 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
 	// sema_up(&thread_current()->load_sema);
