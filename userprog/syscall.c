@@ -223,6 +223,8 @@ int open(const char *file_name)
 	/* 파일 디스크립터 리턴*/
 	if (file != NULL)
 		fd = process_add_file(file);
+	if (fd == -1)
+		file_close(file);
 	lock_release(&filesys_lock);
 
 	/* 해당 파일이 존재하지 않으면 -1 리턴 */
@@ -263,7 +265,7 @@ int read(int fd, void *buffer, unsigned size)
 		return sizeof(user_input);
 	}
 	/* 파일 디스크립터가 0이 아닐 경우 파일의 데이터를 크기만큼 저장 후 읽은 바이트 수를 리턴 */
-	if (file)
+	if (fd >= 2 && file)
 	{
 		int bytes = file_read(file, buffer, size);
 		lock_release(&filesys_lock);
@@ -290,7 +292,7 @@ int write(int fd, const void *buffer, unsigned size)
 		return sizeof(buffer);
 	}
 	/* 파일 디스크립터가 1이 아닐 경우 버퍼에 저장된 데이터를 크기만큼 파일에 기록 후 기록한 바이트 수를 리턴 */
-	if (file)
+	if (fd >= 2 && file)
 	{
 		int bytes = file_write(file, buffer, size);
 		lock_release(&filesys_lock);

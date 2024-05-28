@@ -204,6 +204,7 @@ __do_fork(void *aux)
 	if (succ)
 		do_iret(&if_);
 error:
+	succ = false;
 	sema_up(&current->load_sema);
 	exit(-1);
 }
@@ -454,7 +455,7 @@ int process_add_file(struct file *f)
 struct file *process_get_file(int fd)
 {
 	/* fd 범위 체크 */
-	if (fd < 0 || fd >= FDT_MAX)
+	if (fd < 2 || fd >= FDT_MAX)
 		return NULL;
 	/* 파일 디스크립터에 해당하는 파일 객체를 리턴*/
 	struct file *f = thread_current()->fdt[fd];
@@ -465,7 +466,7 @@ struct file *process_get_file(int fd)
 void process_close_file(int fd)
 {
 	/* fd 범위 체크 */
-	if (fd < 0 || fd >= FDT_MAX)
+	if (fd < 2 || fd >= FDT_MAX)
 		return;
 
 	struct thread *curr = thread_current();
