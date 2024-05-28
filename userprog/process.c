@@ -367,6 +367,8 @@ void process_exit(void)
 	if (curr->run_file)
 		file_close(curr->run_file);
 
+	curr->fdt[0] = NULL;
+	curr->fdt[1] = NULL;
 	/* NOTE: [2.4] 모든 열린 파일 닫기 */
 	for (int idx = 2; idx < FDT_MAX; idx++)
 	{
@@ -374,7 +376,7 @@ void process_exit(void)
 		if (file != NULL)
 			file_close(file);
 	}
-	palloc_free_multiple(curr->fdt, FDT_MAX);
+	palloc_free_multiple(curr->fdt, FDT_PAGES);
 	process_cleanup();
 
 	/* NOTE: [2.3] thread_exit 수정 */

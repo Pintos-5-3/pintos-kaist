@@ -31,6 +31,9 @@ typedef int tid_t;
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63	   /* Highest priority. */
 
+#define FDT_PAGES 3 // fdt 할당 시 필요한 페이지 개수
+#define FDT_MAX (FDT_PAGES * (1 << 9))
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -129,12 +132,6 @@ struct thread
 	/* exit 호출 시 종료 status */
 	int exit_status;
 
-	/* NOTE: [2.4] 파일 디스크립터 테이블 추가 */
-	/* 파일 디스크립터 테이블 */
-	struct file **fdt;
-	/* 현재 테이블에 존재하는 fd값의 최대값 + 1 */
-	int fd_idx;
-
 	/* NOTE: [2.5] 실행 중인 파일 포인터 추가 */
 	struct file *run_file;
 
@@ -144,6 +141,11 @@ struct thread
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
+	/* NOTE: [2.4] 파일 디스크립터 테이블 추가 */
+	/* 파일 디스크립터 테이블 */
+	struct file **fdt;
+	/* 현재 테이블에 존재하는 fd값의 최대값 + 1 */
+	int fd_idx;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
