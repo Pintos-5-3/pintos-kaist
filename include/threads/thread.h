@@ -32,7 +32,7 @@ typedef int tid_t;
 #define PRI_MAX 63	   /* Highest priority. */
 
 #define FDT_PAGES 3 // fdt 할당 시 필요한 페이지 개수
-#define FDT_MAX (FDT_PAGES * (1 << 9))
+#define FDT_MAX 128
 
 /* A kernel thread or user process.
  *
@@ -116,19 +116,6 @@ struct thread
 	struct list_elem all_elem;
 
 	/* NOTE: [2.3] 프로세스 계층 구조 구현을 위한 데이터 추가 */
-	/* 부모 프로세스의 디스크립터 */
-	struct thread *parent;
-	/* 자식 리스트 element */
-	struct list_elem c_elem;
-	/* 자식 리스트 */
-	struct list child_list;
-	/* exit 세마포어 */
-	struct semaphore exit_sema;
-	/* load 세마포어 */
-	struct semaphore load_sema;
-	/* wait 세마포어 */
-	struct semaphore wait_sema;
-
 	/* exit 호출 시 종료 status */
 	int exit_status;
 
@@ -144,8 +131,18 @@ struct thread
 	/* NOTE: [2.4] 파일 디스크립터 테이블 추가 */
 	/* 파일 디스크립터 테이블 */
 	struct file **fdt;
-	/* 현재 테이블에 존재하는 fd값의 최대값 + 1 */
-	int fd_idx;
+	/* 부모 프로세스의 디스크립터 */
+	struct thread *parent;
+	/* 자식 리스트 element */
+	struct list_elem c_elem;
+	/* 자식 리스트 */
+	struct list child_list;
+	/* exit 세마포어 */
+	struct semaphore exit_sema;
+	/* load 세마포어 */
+	struct semaphore load_sema;
+	/* wait 세마포어 */
+	struct semaphore wait_sema;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */

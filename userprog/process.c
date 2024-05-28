@@ -60,6 +60,7 @@ tid_t process_create_initd(const char *file_name) /* NOTE: process_excute() */
 	fn_copy = palloc_get_page(0);
 	if (fn_copy == NULL)
 		return TID_ERROR;
+
 	strlcpy(fn_copy, file_name, PGSIZE);
 
 	/* NOTE: [2.1] program_name 파싱해서 thread_create에 전달 */
@@ -99,6 +100,8 @@ tid_t process_fork(const char *name, struct intr_frame *if_)
 		return TID_ERROR;
 	struct thread *child = get_child_process(tid);
 	sema_down(&child->load_sema);
+	if (child->exit_status == TID_ERROR)
+		return TID_ERROR;
 	return tid;
 }
 
@@ -183,20 +186,15 @@ __do_fork(void *aux)
 	 * NOTE:       from the fork() until this function successfully duplicates
 	 * NOTE:       the resources of parent.*/
 
-	/* FIXME: 왜 해줘야하는거지? */
-	if (parent->fd_idx == FDT_MAX)
-		goto error;
-
-	for (int i = 2; i < FDT_MAX; i++)
+	for (int i = 0; i < FDT_MAX; i++)
 	{
 		struct file *file = parent->fdt[i];
-		if (file != NULL)
-		{
-			struct file *new_file = file_duplicate(file);
-			current->fdt[i] = new_file;
-		}
+		if (file == NULL)
+			continue;
+		if (file > 2)
+			file = file_duplicate(file);
+		current->fdt[i] = file;
 	}
-	current->fd_idx = parent->fd_idx;
 	sema_up(&current->load_sema);
 	process_init();
 
@@ -204,9 +202,8 @@ __do_fork(void *aux)
 	if (succ)
 		do_iret(&if_);
 error:
-	succ = false;
 	sema_up(&current->load_sema);
-	exit(-1);
+	exit(TID_ERROR);
 }
 
 /**
@@ -253,7 +250,10 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	/* If load failed, quit. */
 	palloc_free_page(f_name);
 	if (!success)
+	{
+		free(parse);
 		return -1;
+	}
 
 	/* NOTE: [2.1] 스택에 인자 push 후 dump로 출력 */
 	argument_stack(parse, count, &_if.rsp);
@@ -365,8 +365,7 @@ void process_exit(void)
 	struct thread *curr = thread_current();
 
 	/* NOTE: [2.5] run_file 닫아주기 */
-	if (curr->run_file)
-		file_close(curr->run_file);
+	file_close(curr->run_file);
 
 	curr->fdt[0] = NULL;
 	curr->fdt[1] = NULL;
@@ -436,18 +435,15 @@ int process_add_file(struct file *f)
 {
 	struct thread *curr = thread_current();
 
-	for (int idx = curr->fd_idx; idx < FDT_MAX; idx++)
+	for (int idx = 2; idx < FDT_MAX; idx++)
 	{
 		if (curr->fdt[idx] == NULL)
 		{
 			curr->fdt[idx] = f;
-			curr->fd_idx = idx + 1;
 			/* 파일 디스크립터 리턴 */
 			return idx;
 		}
 	}
-
-	curr->fd_idx = FDT_MAX;
 	return -1;
 }
 
@@ -478,10 +474,6 @@ void process_close_file(int fd)
 	file_close(file);
 	/* 파일 디스크립터 테이블 해당 엔트리 초기화*/
 	curr->fdt[fd] = NULL;
-
-	/* FIXME: 삭제하는 fd가 fd_idx보다 작은 경우, fd_idx 갱신 */
-	if (fd < curr->fd_idx)
-		curr->fd_idx = fd;
 }
 
 /* We load ELF binaries.  The following definitions are taken

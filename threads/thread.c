@@ -240,8 +240,6 @@ tid_t thread_create(const char *name, int priority,
 	list_push_back(&thread_current()->child_list, &t->c_elem);
 
 	/* NOTE: [2.4] 파일 디스크립터 초기화 */
-	/* fd 값 초기화(0,1은 표준 입력,출력) */
-	t->fd_idx = 2;
 	/* File Descriptor 테이블에 메모리 할당 */
 	t->fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
 	t->fdt[0] = 0;
@@ -746,7 +744,7 @@ do_schedule(int status)
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
 		/* NOTE: [2.3] 프로세스 디스크립터를 삭제하지 않도록 수정 */
-		// palloc_free_page(victim);
+		palloc_free_page(victim);
 	}
 	thread_current()->status = status;
 	schedule();
