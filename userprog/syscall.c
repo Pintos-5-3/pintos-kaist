@@ -188,8 +188,10 @@ bool create(const char *file, unsigned initial_size)
 	check_address(file);
 
 	bool success;
+	lock_acquire(&filesys_lock);
 	/* 파일 이름과 크기에 해당하는 파일 생성*/
 	success = filesys_create(file, initial_size);
+	lock_release(&filesys_lock);
 	/* 파일 생성 성공 시 true 반환, 실패 시 false 반환 */
 	return success;
 }
@@ -200,8 +202,10 @@ bool remove(const char *file)
 	check_address(file);
 
 	bool success;
+	lock_acquire(&filesys_lock);
 	/* 파일 이름에 해당하는 파일을 제거*/
 	success = filesys_remove(file);
+	lock_release(&filesys_lock);
 	/* 파일 제거 성공 시 true 반환, 실패 시 false 반환 */
 	return success;
 }
@@ -210,29 +214,35 @@ bool remove(const char *file)
 int open(const char *file_name)
 {
 	check_address(file_name);
-
+	lock_acquire(&filesys_lock);
 	/* 파일을 open */
+	int fd = -1;
 	struct file *file = filesys_open(file_name);
 
 	/* 해당 파일 객체에 파일 디스크립터 부여*/
 	/* 파일 디스크립터 리턴*/
 	if (file != NULL)
-		return process_add_file(file);
+		fd = process_add_file(file);
+	lock_release(&filesys_lock);
 
 	/* 해당 파일이 존재하지 않으면 -1 리턴 */
-	return -1;
+	return fd;
 }
 
 /* NOTE: [2.4] filesize() 시스템 콜 구현 */
 int filesize(int fd)
 {
+	lock_acquire(&filesys_lock);
 	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
 	struct file *file = process_get_file(fd);
+	int size = -1;
 	/* 해당 파일의 길이를 리턴 */
 	if (file != NULL)
-		return file_length(file);
+		size = file_length(file);
+
+	lock_release(&filesys_lock);
 	/* 해당 파일이 존재하지 않으면 -1 리턴 */
-	return -1;
+	return size;
 }
 
 /* NOTE: [2.4] read() 시스템 콜 구현 */
@@ -293,29 +303,36 @@ int write(int fd, const void *buffer, unsigned size)
 /* NOTE: [2.4] seek() 시스템 콜 구현 */
 void seek(int fd, unsigned position)
 {
+	lock_acquire(&filesys_lock);
 	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
 	struct file *file = process_get_file(fd);
 	/* 해당 열린 파일의 위치(offset)를 position만큼 이동 */
 	if (file)
 		file_seek(file, position);
+	lock_release(&filesys_lock);
 }
 
 /* NOTE: [2.4] tell() 시스템 콜 구현 */
 unsigned tell(int fd)
 {
+	lock_acquire(&filesys_lock);
 	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
 	struct file *file = process_get_file(fd);
+	unsigned position = -1;
 	/* 해당 열린 파일의 위치를 반환 */
 	if (file)
-		return file_tell(file);
-	return -1;
+		position = file_tell(file);
+	lock_release(&filesys_lock);
+	return position;
 }
 
 /* NOTE: [2.4] close() 시스템 콜 구현 */
 void close(int fd)
 {
+	lock_acquire(&filesys_lock);
 	/* 해당 파일 디스크립터에 해당하는 파일을 닫음 */
 	process_close_file(fd);
+	lock_release(&filesys_lock);
 }
 
 /* ---------- UTIL ---------- */
