@@ -171,10 +171,7 @@ pid_t exec(const char *cmd_line)
 	strlcpy(cmd_line_cpy, cmd_line, PGSIZE);
 
 	if (process_exec(cmd_line_cpy) == -1)
-	{
-		palloc_free_page(cmd_line_cpy);
 		exit(-1);
-	}
 }
 
 /* NOTE: [2.3] wait() 시스템 콜 구현 */

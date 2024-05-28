@@ -565,9 +565,6 @@ load(const char *file_name, struct intr_frame *if_)
 		printf("load: %s: open failed\n", file_name);
 		goto done;
 	}
-	/* NOTE: [2.5] 파일 open 시 file_deny_write() 호출 / thread 구조체에 실행 중인 파일 추가 */
-	file_deny_write(file);
-	thread_current()->run_file = file;
 
 	/* Read and verify executable header. */
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
@@ -634,6 +631,9 @@ load(const char *file_name, struct intr_frame *if_)
 			break;
 		}
 	}
+	/* NOTE: [2.5] 파일 open 시 file_deny_write() 호출 / thread 구조체에 실행 중인 파일 추가 */
+	file_deny_write(file);
+	t->run_file = file;
 
 	/* Set up stack. */
 	if (!setup_stack(if_))
