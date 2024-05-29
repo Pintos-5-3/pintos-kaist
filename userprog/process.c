@@ -279,14 +279,6 @@ static void argument_stack(char **parse, int count, void **rsp)
 	char *address[count + 1];
 	memset(address, NULL, sizeof(address));
 
-	/* word-align */
-	uint8_t align = (uint8_t)(*rsp) % 8;
-	if (align != 0)
-	{
-		*rsp = *rsp - align;
-		memset(*rsp, 0, align);
-	}
-
 	int len;
 	/* Argument */
 	for (int i = count - 1; i > -1; i--)
@@ -298,7 +290,7 @@ static void argument_stack(char **parse, int count, void **rsp)
 	}
 
 	/* word-align */
-	align = (uint8_t)(*rsp) % 8;
+	uint8_t align = (uint8_t)(*rsp) % 8;
 	if (align != 0)
 	{
 		*rsp = *rsp - align;
@@ -315,14 +307,6 @@ static void argument_stack(char **parse, int count, void **rsp)
 	/* fake addreass(0) */
 	*rsp = *rsp - sizeof(void (*)());
 	*(void (**)())(*rsp) = 0;
-
-	/* word-align */
-	align = (uint8_t)(*rsp) % 8;
-	if (align != 0)
-	{
-		*rsp = *rsp - align;
-		memset(*rsp, 0, align);
-	}
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -366,17 +350,12 @@ void process_exit(void)
 
 	/* NOTE: [2.5] run_file 닫아주기 */
 	file_close(curr->run_file);
+	curr->run_file = NULL;
 
-	curr->fdt[0] = NULL;
-	curr->fdt[1] = NULL;
 	/* NOTE: [2.4] 모든 열린 파일 닫기 */
 	for (int idx = 2; idx < FDT_MAX; idx++)
-	{
-		struct file *file = process_get_file(idx);
-		if (file != NULL)
-			file_close(file);
-	}
-	palloc_free_multiple(curr->fdt, FDT_PAGES);
+		file_close(process_get_file(idx));
+	palloc_free_page(curr->fdt);
 	process_cleanup();
 
 	/* NOTE: [2.3] thread_exit 수정 */
@@ -464,13 +443,8 @@ void process_close_file(int fd)
 	/* fd 범위 체크 */
 	if (fd < 2 || fd >= FDT_MAX)
 		return;
-
 	struct thread *curr = thread_current();
 	struct file *file = process_get_file(fd);
-	if (file == NULL)
-		return;
-
-	/* 파일 디스크립터에 해당하는 파일을 닫음*/
 	file_close(file);
 	/* 파일 디스크립터 테이블 해당 엔트리 초기화*/
 	curr->fdt[fd] = NULL;

@@ -241,9 +241,12 @@ tid_t thread_create(const char *name, int priority,
 
 	/* NOTE: [2.4] 파일 디스크립터 초기화 */
 	/* File Descriptor 테이블에 메모리 할당 */
-	t->fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
-	t->fdt[0] = 0;
-	t->fdt[1] = 1;
+	t->fdt = palloc_get_page(PAL_ZERO);
+	if (t->fdt == NULL)
+	{
+		palloc_free_page(t);
+		return TID_ERROR;
+	}
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -617,6 +620,7 @@ init_thread(struct thread *t, const char *name, int priority)
 
 	/* NOTE: [2.3] 자식 리스트 초기화 */
 	list_init(&t->child_list);
+	t->run_file = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -743,7 +747,6 @@ do_schedule(int status)
 	{
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
-		/* NOTE: [2.3] 프로세스 디스크립터를 삭제하지 않도록 수정 */
 		palloc_free_page(victim);
 	}
 	thread_current()->status = status;
@@ -783,8 +786,7 @@ schedule(void)
 		{
 			ASSERT(curr != next);
 			list_remove(&curr->all_elem); /* NOTE: [Improve] 쓰레드가 죽을 때 all_list에서 제거 */
-
-			// list_push_back(&destruction_req, &curr->elem);
+			list_push_back(&destruction_req, &curr->elem);
 		}
 
 		/* Before switching the thread, we first save the information
