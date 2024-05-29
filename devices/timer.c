@@ -150,7 +150,7 @@ timer_interrupt(struct intr_frame *args UNUSED)
 	thread_tick();
 
 	/**
-	 * NOTE: [Part3]
+	 * NOTE: [1.3]
 	 * - 4 tick마다 모든 쓰레드의 우선순위 재계산
 	 * - 1 sec마다 load_avg, recent_cpu 재계산
 	 */

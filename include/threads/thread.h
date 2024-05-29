@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/fixed_point.h"
+#include "threads/synch.h"
+#include "filesys/file.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -28,6 +30,9 @@ typedef int tid_t;
 #define PRI_MIN 0	   /* Lowest priority. */
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63	   /* Highest priority. */
+
+#define FDT_PAGES 3 // fdt 할당 시 필요한 페이지 개수
+#define FDT_MAX 128
 
 /* A kernel thread or user process.
  *
@@ -103,16 +108,41 @@ struct thread
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
 
-	/* NOTE: [Part3] MLFQ를 위한 데이터 추가 - nice, recent_cpu */
+	/* NOTE: [1.3] MLFQ를 위한 데이터 추가 - nice, recent_cpu */
 	int nice;			/* 쓰레드의 친절함을 나타내는 지표 */
 	int32_t recent_cpu; /* 쓰레드의 최근 CPU 사용량을 나타내는 지표 */
 
 	/* NOTE: [Improve] all_list element */
 	struct list_elem all_elem;
 
+	/* NOTE: [2.3] 프로세스 계층 구조 구현을 위한 데이터 추가 */
+	/* exit 호출 시 종료 status */
+	int exit_status;
+
+	/* NOTE: [2.5] 실행 중인 파일 포인터 추가 */
+	struct file *run_file;
+
+	/* NOTE: [2.5] fork를 위한 if 구조체 */
+	struct intr_frame parent_if;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
+	/* NOTE: [2.4] 파일 디스크립터 테이블 추가 */
+	/* 파일 디스크립터 테이블 */
+	struct file **fdt;
+	/* 부모 프로세스의 디스크립터 */
+	struct thread *parent;
+	/* 자식 리스트 element */
+	struct list_elem c_elem;
+	/* 자식 리스트 */
+	struct list child_list;
+	/* exit 세마포어 */
+	struct semaphore exit_sema;
+	/* load 세마포어 */
+	struct semaphore load_sema;
+	/* wait 세마포어 */
+	struct semaphore wait_sema;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
@@ -171,5 +201,7 @@ void thread_all_calc_recent_cpu(void);
 bool compare_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED);
 void do_iret(struct intr_frame *tf);
 bool cmp_priority(const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+
+struct thread *get_child_process(tid_t pid);
 
 #endif /* threads/thread.h */

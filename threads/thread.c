@@ -12,6 +12,7 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #include "threads/fixed_point.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -29,7 +30,7 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
-/* NOTE: [Part1] 상태가 THREAD_BLOCKED인 쓰레드들의 리스트 */
+/* NOTE: [1.1] 상태가 THREAD_BLOCKED인 쓰레드들의 리스트 */
 static struct list sleep_list;
 
 /* NOTE: [Improve] 모든 쓰레드를 담는 리스트 */
@@ -59,7 +60,7 @@ static long long user_ticks;   /* # of timer ticks in user programs. */
 #define TIME_SLICE 4		  /* # of timer ticks to give each thread. */
 static unsigned thread_ticks; /* # of timer ticks since last yield. */
 
-/* NOTE: [Part3] 시스템 부하 */
+/* NOTE: [1.3] 시스템 부하 */
 fixed_point load_avg;
 
 /* If false (default), use round-robin scheduler.
@@ -130,7 +131,7 @@ void thread_init(void)
 	list_init(&destruction_req);
 
 	global_tick = INT64_MAX; /* global tick 초기화 */
-	load_avg = int_to_fp(0); /* NOTE: [Part3] load_avg 초기화 */
+	load_avg = int_to_fp(0); /* NOTE: [1.3] load_avg 초기화 */
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread();
@@ -226,8 +227,26 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-	/* NOTE: [Improve] 모든 쓰레드 생성 시 all_list에 추가 */
-	// list_push_back(&all_list, &t->all_elem);
+	/* NOTE: [2.3] 자료구조 초기화 */
+	/* 부모 프로세스 저장 */
+	t->parent = thread_current();
+	/* exit 세마포어 0으로 초기화 */
+	sema_init(&t->exit_sema, 0);
+	/* load 세마포어 0으로 초기화 */
+	sema_init(&t->load_sema, 0);
+	/* wait 세마포어 0으로 초기화 */
+	sema_init(&t->wait_sema, 0);
+	/* 자식 리스트에 추가 */
+	list_push_back(&thread_current()->child_list, &t->c_elem);
+
+	/* NOTE: [2.4] 파일 디스크립터 초기화 */
+	/* File Descriptor 테이블에 메모리 할당 */
+	t->fdt = palloc_get_page(PAL_ZERO);
+	if (t->fdt == NULL)
+	{
+		palloc_free_page(t);
+		return TID_ERROR;
+	}
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -322,7 +341,6 @@ void thread_exit(void)
 #ifdef USERPROG
 	process_exit();
 #endif
-
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable();
@@ -465,7 +483,7 @@ int thread_get_priority(void)
 	return thread_current()->priority;
 }
 
-/** NOTE: [Part3]
+/** NOTE: [1.3]
  * @brief 현재 실행 중인 쓰레드의 nice 값을 설정하는 함수
  */
 void thread_set_nice(int new_nice)
@@ -478,7 +496,7 @@ void thread_set_nice(int new_nice)
 	intr_set_level(old_level);
 }
 
-/** NOTE: [Part3]
+/** NOTE: [1.3]
  * @brief 현재 실행 중인 쓰레드의 nice 값을 반환하는 함수
  *
  * @return int 현재 쓰레드의 nice 값
@@ -491,7 +509,7 @@ int thread_get_nice(void)
 	return nice;
 }
 
-/** NOTE: [Part3]
+/** NOTE: [1.3]
  * @brief 시스템의 평균 부하(load average)를 반환하는 함수
  * 시스템의 평균 부하를 100배하여 정수로 반환
  *
@@ -507,7 +525,7 @@ int thread_get_load_avg(void)
 	return load_avg;
 }
 
-/** NOTE: [Part3]
+/** NOTE: [1.3]
  * @brief 현재 실행 중인 쓰레드의 최근 CPU 사용량을 반환하는 함수
  * 현재 실행 중인 쓰레드의 최근 CPU 사용량을 100배하여 정수로 반환
  *
@@ -593,12 +611,16 @@ init_thread(struct thread *t, const char *name, int priority)
 	list_init(&t->donations);
 	t->origin_priority = priority;
 
-	/* NOTE: [Part3] MLFQ를 위한 데이터 초기화 */
+	/* NOTE: [1.3] MLFQ를 위한 데이터 초기화 */
 	t->nice = 0;
 	t->recent_cpu = 0;
 
 	/* NOTE: [Improve] 모든 쓰레드 생성 시 all_list에 추가 */
 	list_push_back(&all_list, &t->all_elem);
+
+	/* NOTE: [2.3] 자식 리스트 초기화 */
+	list_init(&t->child_list);
+	t->run_file = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -725,7 +747,6 @@ do_schedule(int status)
 	{
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
-		list_remove(&victim->all_elem); /* NOTE: [Improve] 쓰레드가 죽을 때 all_list에서 제거 */
 		palloc_free_page(victim);
 	}
 	thread_current()->status = status;
@@ -764,6 +785,7 @@ schedule(void)
 		if (curr && curr->status == THREAD_DYING && curr != initial_thread)
 		{
 			ASSERT(curr != next);
+			list_remove(&curr->all_elem); /* NOTE: [Improve] 쓰레드가 죽을 때 all_list에서 제거 */
 			list_push_back(&destruction_req, &curr->elem);
 		}
 
@@ -839,7 +861,7 @@ bool compare_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED
 	// a가 더 크면 true, b가 더 크면 false 반환
 }
 
-/* NOTE: [Part3] recent_cpu와 nice를 이용해 priority를 계산하는 함수 구현 */
+/* NOTE: [1.3] recent_cpu와 nice를 이용해 priority를 계산하는 함수 구현 */
 void thread_calc_priority(struct thread *t)
 {
 	fixed_point quarter_cpu = div_fp(t->recent_cpu, int_to_fp(4));
@@ -849,7 +871,7 @@ void thread_calc_priority(struct thread *t)
 	t->priority = PRI_MAX - cpu_to_priority - nice_to_priority;
 }
 
-/* NOTE: [Part3] recent_cpu를 계산하는 함수 구현 */
+/* NOTE: [1.3] recent_cpu를 계산하는 함수 구현 */
 void thread_calc_recent_cpu(struct thread *t)
 {
 	/* 계산에 필요한 정수를 고정 소수점 값으로 변경 */
@@ -868,7 +890,7 @@ void thread_calc_recent_cpu(struct thread *t)
 	t->recent_cpu = add_fp(decayed_recent_cpu, nice_fp);
 }
 
-/* NOTE: [Part3] load_avg를 계산하는 함수 구현 */
+/* NOTE: [1.3] load_avg를 계산하는 함수 구현 */
 void calc_load_avg()
 {
 	/* 계산에 필요한 가중치 계산 */
@@ -887,7 +909,7 @@ void calc_load_avg()
 	load_avg = add_fp(weighted_avg, weighted_ready_threads);
 }
 
-/* NOTE: [Part3] recent_cpu를 1씩 증가시키는 함수 구현 */
+/* NOTE: [1.3] recent_cpu를 1씩 증가시키는 함수 구현 */
 void thread_incr_recent_cpu()
 {
 	struct thread *curr = thread_current();
@@ -896,7 +918,7 @@ void thread_incr_recent_cpu()
 		curr->recent_cpu = add_fp(curr->recent_cpu, int_to_fp(1));
 }
 
-/* NOTE: [Part3/Improve] `모든` 쓰레드의 우선순위를 재계산하는 함수 구현 */
+/* NOTE: [1.3/Improve] `모든` 쓰레드의 우선순위를 재계산하는 함수 구현 */
 void thread_all_calc_priority()
 {
 	struct list_elem *e;
@@ -911,7 +933,7 @@ void thread_all_calc_priority()
 	}
 }
 
-/* NOTE: [Part3/Improve] `모든` 쓰레드의 recent_cpu를 재계산하는 함수 구현 */
+/* NOTE: [1.3/Improve] `모든` 쓰레드의 recent_cpu를 재계산하는 함수 구현 */
 void thread_all_calc_recent_cpu()
 {
 	struct list_elem *e;
@@ -924,4 +946,25 @@ void thread_all_calc_recent_cpu()
 		thread_calc_recent_cpu(t);
 		e = list_next(e);
 	}
+}
+
+/* NOTE: [2.3] 자식 프로세스 검색 함수 구현 */
+struct thread *get_child_process(tid_t tid)
+{
+	struct thread *curr, *child;
+	struct list_elem *e;
+
+	curr = thread_current();
+
+	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색*/
+	for (e = list_begin(&curr->child_list); e != list_end(&curr->child_list); e = list_next(e))
+	{
+		child = list_entry(e, struct thread, c_elem);
+		/* 해당 pid가 존재하면 프로세스 디스크립터 반환 */
+		if (child->tid == tid)
+			return child;
+	}
+
+	/* 리스트에 존재하지 않으면 NULL 리턴*/
+	return NULL;
 }
