@@ -691,6 +691,8 @@ static bool install_page(void *upage, void *kpage, bool writable);
  *
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
+
+/*파일로부터 읽을 바이트 수와 0으로 채워야 할 바이트의 수 측정*/
 static bool
 load_segment(struct file *file, off_t ofs, uint8_t *upage,
 			 uint32_t read_bytes, uint32_t zero_bytes, bool writable)
@@ -737,21 +739,28 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 	return true;
 }
 
-/* Create a minimal stack by mapping a zeroed page at the USER_STACK */
+/* Create a minimal stack by mapping a zeroed page at the USER_STACK 
+가상 메모리에 페이지 할당 -> 사용자 스택에 매핑하여 최소한의 스택 환경 구성*/
 static bool
 setup_stack(struct intr_frame *if_)
 {
-	uint8_t *kpage;
+	uint8_t *kpage; //커널에서 사용할 페이지 포인터
 	bool success = false;
 
-	kpage = palloc_get_page(PAL_USER | PAL_ZERO);
+	//사용자 모드에서 사용할 페이지 할당, 모든 바이트 0으로 초기화
+	kpage = palloc_get_page(PAL_USER | PAL_ZERO); 
+
 	if (kpage != NULL)
 	{
+		/*할당된 페이지를 사용자 스택의 top 주소로 매핑
+		- 스택은 높은 주소에서 낮은 주소로 성장 
+		(USER_STACK - 한 페이지의 크기) => 새로운 스택의 시작점으로 설정*/
 		success = install_page(((uint8_t *)USER_STACK) - PGSIZE, kpage, true);
+
 		if (success)
-			if_->rsp = USER_STACK;
+			if_->rsp = USER_STACK; //스택 포인터를 새로운 사용자 스택의 최상단 주소로 
 		else
-			palloc_free_page(kpage);
+			palloc_free_page(kpage); //할당된 페이지 해제
 	}
 	return success;
 }

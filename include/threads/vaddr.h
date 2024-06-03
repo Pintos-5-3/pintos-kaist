@@ -15,10 +15,10 @@
 #define BITMASK(SHIFT, CNT) (((1ul << (CNT)) - 1) << (SHIFT))
 
 /* Page offset (bits 0:12). */
-#define PGSHIFT 0                          /* Index of first offset bit. */
-#define PGBITS  12                         /* Number of offset bits. */
-#define PGSIZE  (1 << PGBITS)              /* Bytes in a page. */
-#define PGMASK  BITMASK(PGSHIFT, PGBITS)   /* Page offset bits (0:12). */
+#define PGSHIFT 0                          /* Index of first offset bit. 페이지 오프셋 비트의 시작 인덱스 - 0에서 시작*/
+#define PGBITS  12                         /* Number of offset bits. 페이지 오프셋에 사용되는 비트 수 - 12 비트 페이지의 크기는 2^12 -> 4KB*/
+#define PGSIZE  (1 << PGBITS)              /* Bytes in a page. 페이지 크기를 바이트 단위로 정의 -> 4KB*/
+#define PGMASK  BITMASK(PGSHIFT, PGBITS)   /* Page offset bits (0:12). 페이지 오프셋 비트를 마스킹하기 위한 값 -> 페이지 내에서 오프셋 결정하는 데 사용됨*/
 
 /* Offset within a page. */
 #define pg_ofs(va) ((uint64_t) (va) & PGMASK)
@@ -29,7 +29,7 @@
 #define pg_round_up(va) ((void *) (((uint64_t) (va) + PGSIZE - 1) & ~PGMASK))
 
 /* Round down to nearest page boundary. */
-#define pg_round_down(va) (void *) ((uint64_t) (va) & ~PGMASK)
+#define pg_round_down(va) (void *) ((uint64_t) (va) & ~PGMASK) //특정 주소가 속한 페이지의 시작 주소 쉽게 계산
 
 /* Kernel virtual address start */
 #define KERN_BASE LOADER_KERN_BASE
