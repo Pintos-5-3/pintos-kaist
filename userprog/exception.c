@@ -118,6 +118,16 @@ kill(struct intr_frame *f)
    can find more information about both of these in the
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
+/*
+	페이지 오류 처리기. 가상 메모리를 구현하기 위해 반드시 채워야 하는 뼈대이다. 
+	프로젝트 2의 일부 솔루션에서는 이 코드를 수정해야 할 수도 있습니다.
+	
+	시작 시 오류가 발생한 주소는 CR2(제어 레지스터 2)에 있고 오류에 대한 정보는 
+	예외.h의 PF_* 매크로에 설명된 형식으로 F의 error_code 멤버에 있습니다. 
+	여기의 예제 코드는 해당 정보를 구문 분석하는 방법을 보여줍니다. 
+	[IA32-v3a] 섹션 5.15 "예외 및 인터럽트 참조"의 "인터럽트 14--페이지 
+	오류 예외(#PF)" 설명에서 이 두 가지에 대한 자세한 정보를 찾을 수 있습니다.
+*/
 static void
 page_fault(struct intr_frame *f)
 {

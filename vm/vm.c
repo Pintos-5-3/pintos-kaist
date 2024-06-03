@@ -65,6 +65,15 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
+	// struct page page // va 와 일치하는 page 정보를 찾기 위해서 임시적인 공간을 만들어줌
+  	// struct hash_elem *e; // hash_find를 통해서 찾은 hash_elem을 저장하기 위한 공간
+
+	// page->va = pg_round_down (va); // pg_round_down() 함수를 통해서 page의 시작주소로 변경을 해준 후 위에서 만든 임시공간의 va와 연결시켜줌
+	// e = hash_find (&spt->page_table, &page->elem_hash); // 입력받은 spt hash에서 일치하는 page를 찾고 --> 해당 page의 hash_elem을 e로 return 한다
+	// free (page); // page의 역할을 다 끝났으니 free 해주고
+
+  	// return e != NULL ? hash_entry (e, struct page, elem_hash) : NULL;
+
 
 	return page;
 }
@@ -135,7 +144,11 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
+	//spt->page_table.
+
 	/* TODO: Your code goes here */
+
+
 
 	return vm_do_claim_page (page);
 }
@@ -174,6 +187,7 @@ vm_do_claim_page (struct page *page) {
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+	hash_init(&spt->page_table,page_hash,page_cmp_less,NULL);
 }
 
 /* Copy supplemental page table from src to dst */
@@ -187,4 +201,23 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+}
+
+// uint64_t vm_hash_func(const struct hash_elem *e, void *aux){
+// 	struct hash_iterator* cur_hash = hash_entry(e,struct hash_iterator, elem);
+// }
+
+unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED)
+{
+	const struct page *p = hash_entry(p_, struct page, elem_hash);
+	return hash_bytes(&p->va, sizeof p->va);
+}
+
+bool
+page_cmp_less (const struct hash_elem *a_, const struct hash_elem *b_,
+               void *aux UNUSED) {
+  const struct page *a = hash_entry (a_, struct page, elem_hash);
+  const struct page *b = hash_entry (b_, struct page, elem_hash);
+
+  return a->va < b->va;
 }
