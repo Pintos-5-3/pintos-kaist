@@ -3,6 +3,7 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "lib/kernel/hash.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -63,8 +64,16 @@ err:
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page *page = NULL;
+	struct page *page = (struct page *)malloc(sizeof(struct page));
 	/* TODO: Fill this function. */
+	page->va = pg_round_down(va);		// 입력 받은 va를 이용하여 페이지 번호를 얻음
+										// page 구조체의 va에 맞게 아래 비트들을 0으로 바꿔줘서 저장
+	struct hash_elem *he = hash_find(&spt->spt_hash, &page->hash_elem);
+	if(he == NULL) {
+		free(page);
+		return NULL;
+	}
+	page = hash_entry(he, struct page, hash_elem);
 
 	return page;
 }
@@ -75,6 +84,7 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	int succ = false;
 	/* TODO: Fill this function. */
+	succ = page_insert(&spt->spt_hash, page);
 
 	return succ;
 }
@@ -135,6 +145,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
+
 	/* TODO: Your code goes here */
 
 	return vm_do_claim_page (page);
@@ -167,6 +178,7 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	
 
 	return swap_in (page, frame->kva);
 }
@@ -174,12 +186,14 @@ vm_do_claim_page (struct page *page) {
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+	hash_init(&spt->spt_hash, hash_func, page_less_func, NULL);
 }
 
 /* Copy supplemental page table from src to dst */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
+
 }
 
 /* Free the resource hold by the supplemental page table */
@@ -187,4 +201,5 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+
 }

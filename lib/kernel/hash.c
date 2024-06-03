@@ -93,7 +93,7 @@ hash_insert (struct hash *h, struct hash_elem *new) {
 	struct list *bucket = find_bucket (h, new);
 	struct hash_elem *old = find_elem (h, bucket, new);
 
-	if (old == NULL)
+	if (old == NULL)				// elem과 같은 hash_elem이 없을 때에만 삽입
 		insert_elem (h, bucket, new);
 
 	rehash (h);
@@ -275,7 +275,7 @@ uint64_t
 hash_int (int i) {
 	return hash_bytes (&i, sizeof i);
 }
-
+
 /* Returns the bucket in H that E belongs in. */
 static struct list *
 find_bucket (struct hash *h, struct hash_elem *e) {
@@ -392,3 +392,28 @@ remove_elem (struct hash *h, struct hash_elem *e) {
 	list_remove (&e->list_elem);
 }
 
+
+// project3 memory management (hash 초기화를 위한 함수)
+/* hash function */
+unsigned hash_func (const struct hash_elem *e, void *aux) {
+	struct page *p = hash_entry(e, struct page, hash_elem);
+	return hash_int((uint64_t)p->va);
+}
+
+/* hash bucket 내에서 어떤 기준으로 정렬시킬 지 위한 함수 */
+static unsigned page_less_func (const struct hash_elem *a,
+		const struct hash_elem *b,
+		void *aux) {
+	struct page *p_a = hash_entry(a, struct page, hash_elem);
+	struct page *p_b = hash_entry(b, struct page, hash_elem);
+	return (uint64_t)p_a->va > (uint64_t)p_b->va;
+}
+
+bool page_insert(struct hash *h, struct page *p) {
+	if(!hash_insert(h, &p->hash_elem))	return true;
+	else	return false;
+}
+
+bool page_delete(struct hash *h, struct page *p) {
+	return hash_delete(h, &p->hash_elem);
+}
