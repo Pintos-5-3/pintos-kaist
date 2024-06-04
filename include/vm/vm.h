@@ -3,8 +3,8 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "hash.h"
-#include "vaddr.h"
-#include "mmu.h"
+#include "include/threads/vaddr.h"
+#include "include/threads/mmu.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -68,6 +68,8 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+
+	struct list_elem frame_elem;		// frame table을 list로 다루기 위해서 추가
 };
 
 /* The function table for page operations.

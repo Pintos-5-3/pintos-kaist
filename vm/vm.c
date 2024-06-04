@@ -4,6 +4,8 @@
 #include "vm/vm.h"
 #include "vm/inspect.h"
 
+struct list frame_table;		// frame table 선언
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -53,8 +55,35 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		/* TODO: Create the page, fetch the initialier according to the VM type,
 		 * TODO: and then create "uninit" page struct by calling uninit_new. You
 		 * TODO: should modify the field after calling the uninit_new. */
+		struct page *page = (struct page *)malloc(sizeof(struct page));
+		// page를 생성해준 후
+		bool (*page_initializer)(struct page *, enum vm_type, void *);	// page를 init 해줄 initializer 선언
+		switch(VM_TYPE(type)) {			// 입력받은 type 변수에서 VM page의 타입을 추출함
+			case VM_ANON:
+				page_initializer = anon_initializer;
+				break;
+			case VM_FILE:
+				page_initializer = file_backed_initializer;
+				break;
+			default:
+				free(page);
+				break;
+		}
+		// 요청된 page type에 맞게 initializer를 fetch 해온다.
+
+		uninit_new(page, upage, init, type, aux, page_initializer);
+		// uninit_new 함수를 통해 page를 uninit 상태로 초기화해준다.
+
+		page->writable = writable;
+		// page의 writable 변수를 입력받은 인자로 바꿔준다.
 
 		/* TODO: Insert the page into the spt. */
+		if(spt_insert_page(spt, page)) {		// 현재 쓰레드의 spt에 생성한 page를 넣어준다.
+			return true;
+		}
+		else {
+			return false;
+		}
 	}
 err:
 	return false;
