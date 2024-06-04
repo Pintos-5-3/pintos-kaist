@@ -3,7 +3,8 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "hash.h"
-#include "include/threads/vaddr.h"
+#include "vaddr.h"
+#include "mmu.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -113,5 +114,15 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
+
+/* hash function */
+unsigned hash_func (const struct hash_elem *e, void *aux);
+/* hash bucket 내에서 어떤 기준으로 정렬시킬 지 위한 함수 */
+static unsigned page_less_func (const struct hash_elem *a,
+		const struct hash_elem *b,
+		void *aux);
+
+bool page_insert(struct hash *h, struct page *p);
+bool page_delete(struct hash *h, struct page *p);
 
 #endif  /* VM_VM_H */

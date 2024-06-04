@@ -3,7 +3,6 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
-#include "lib/kernel/hash.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -71,6 +70,7 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct hash_elem *he = hash_find(&spt->spt_hash, &page->hash_elem);
 	if(he == NULL) {
 		free(page);
+		page = NULL;
 		return NULL;
 	}
 	page = hash_entry(he, struct page, hash_elem);
@@ -122,6 +122,29 @@ static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
 	/* TODO: Fill this function. */
+	void *kva = palloc_get_page(PAL_USER);	// 일단 USER frame이므로 flag로 user로 설정
+
+	if(kva == NULL) {		// 페이지(프레임) 할당 실패 시 메모리에 공간이 없다는 뜻이므로
+		PANIC("todo");
+		/* victim frame을 고르는 함수가 와야할듯? */
+
+		return NULL;
+	}
+
+	frame = (struct frame *)malloc(sizeof(struct frame));
+	// frame 구조체 자체가 page보다 작을 수 있으므로 크기가 변동적인 malloc으로 할당
+	
+	if(frame == NULL) {
+		palloc_free_page(kva);
+		PANIC("todo");
+		/* 여기도 뭔가가 더 와야할 것 같음 */
+
+		return NULL;
+	}
+
+	// frame 구조체 초기화
+	frame->kva = kva;
+	// frame->page = NULL;		// <= 이거 하면 밑에 ASSERT 걸리지 않나?
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -164,8 +187,14 @@ bool
 vm_claim_page (void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
+	struct thread *cur = thread_current();			// 현재 스레드의
+	struct supplemental_page_table *spt = &cur->spt;	// spt를 가져와서
+	page = spt_find_page(spt, va);		// va를 가진 page entry를 찾음
+	if(page == NULL) {		// 못찾으면 할당 불가이므로 false return
+		return false;
+	}
 
-	return vm_do_claim_page (page);
+	return vm_do_claim_page (page);	// 찾으면 frame을 할당하는 함수를 호출함
 }
 
 /* Claim the PAGE and set up the mmu. */
@@ -176,11 +205,14 @@ vm_do_claim_page (struct page *page) {
 	/* Set links */
 	frame->page = page;
 	page->frame = frame;
+	// page와 frame을 매칭시키는 작업(MMU 세팅)
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-	
+	struct thread *cur = thread_current();
+	pml4_set_page(cur->pml4, page, frame, page->writable);
+	// 현재 쓰레드의 page table에 현재 연결한 page와 frame에 대한 정보를 담음
 
-	return swap_in (page, frame->kva);
+	return swap_in (page, frame->kva);		// swap in을 하며 끝남
 }
 
 /* Initialize new supplemental page table */
@@ -202,4 +234,29 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 
+}
+
+// project3 memory management (hash 초기화를 위한 함수)
+/* hash function */
+unsigned hash_func (const struct hash_elem *e, void *aux) {
+	struct page *p = hash_entry(e, struct page, hash_elem);
+	return hash_int((uint64_t)p->va);
+}
+
+/* hash bucket 내에서 어떤 기준으로 정렬시킬 지 위한 함수 */
+static unsigned page_less_func (const struct hash_elem *a,
+		const struct hash_elem *b,
+		void *aux) {
+	struct page *p_a = hash_entry(a, struct page, hash_elem);
+	struct page *p_b = hash_entry(b, struct page, hash_elem);
+	return (uint64_t)p_a->va > (uint64_t)p_b->va;
+}
+
+bool page_insert(struct hash *h, struct page *p) {
+	if(!hash_insert(h, &p->hash_elem))	return true;
+	else	return false;
+}
+
+bool page_delete(struct hash *h, struct page *p) {
+	return hash_delete(h, &p->hash_elem);
 }

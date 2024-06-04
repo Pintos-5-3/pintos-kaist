@@ -391,29 +391,3 @@ remove_elem (struct hash *h, struct hash_elem *e) {
 	h->elem_cnt--;
 	list_remove (&e->list_elem);
 }
-
-
-// project3 memory management (hash 초기화를 위한 함수)
-/* hash function */
-unsigned hash_func (const struct hash_elem *e, void *aux) {
-	struct page *p = hash_entry(e, struct page, hash_elem);
-	return hash_int((uint64_t)p->va);
-}
-
-/* hash bucket 내에서 어떤 기준으로 정렬시킬 지 위한 함수 */
-static unsigned page_less_func (const struct hash_elem *a,
-		const struct hash_elem *b,
-		void *aux) {
-	struct page *p_a = hash_entry(a, struct page, hash_elem);
-	struct page *p_b = hash_entry(b, struct page, hash_elem);
-	return (uint64_t)p_a->va > (uint64_t)p_b->va;
-}
-
-bool page_insert(struct hash *h, struct page *p) {
-	if(!hash_insert(h, &p->hash_elem))	return true;
-	else	return false;
-}
-
-bool page_delete(struct hash *h, struct page *p) {
-	return hash_delete(h, &p->hash_elem);
-}

@@ -24,7 +24,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "list.h"
-#include "include/vm/vm.h"
 
 /* Hash element. */
 struct hash_elem {
@@ -98,15 +97,5 @@ bool hash_empty (struct hash *);
 uint64_t hash_bytes (const void *, size_t);
 uint64_t hash_string (const char *);
 uint64_t hash_int (int);
-
-/* hash function */
-unsigned hash_func (const struct hash_elem *e, void *aux);
-/* hash bucket 내에서 어떤 기준으로 정렬시킬 지 위한 함수 */
-static unsigned page_less_func (const struct hash_elem *a,
-		const struct hash_elem *b,
-		void *aux);
-
-bool page_insert(struct hash *h, struct page *p);
-bool page_delete(struct hash *h, struct page *p);
 
 #endif /* lib/kernel/hash.h */
