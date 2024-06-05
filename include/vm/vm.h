@@ -2,9 +2,9 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
-#include <hash.h>
 
-#define PAGE_TABLE_SIZE 1000000;
+#include "include/lib/kernel/hash.h"
+#include "threads/mmu.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -51,6 +51,8 @@ struct page {
 
 	/* Your implementation */
 	struct hash_elem hash_elem;
+	bool writable;
+
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -66,8 +68,10 @@ struct page {
 
 /* The representation of "frame" */
 struct frame {
-	void *kva;
-	struct page *page;
+	void *kva; /*커널 virtual address*/
+	struct page *page; /*페이지 구조*/
+	/*---------added for Project 3-------*/
+
 	struct list_elem frame_elem;
 };
 
@@ -116,7 +120,14 @@ void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
 
-unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
-bool page_cmp_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
+
+unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED);
+bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
+static bool insert_page(struct hash *hash, struct page *page);
+static bool delete_page(struct hash *hash, struct page *page); 
+
+static struct list frame_table;
+static struct list_elem *ft_start;
+
 
 #endif  /* VM_VM_H */

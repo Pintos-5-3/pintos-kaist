@@ -27,8 +27,8 @@ hash_init (struct hash *h,
 	h->elem_cnt = 0;
 	h->bucket_cnt = 4;
 	h->buckets = malloc (sizeof *h->buckets * h->bucket_cnt);
-	h->hash = hash;
-	h->less = less;
+	h->hash = hash; //hash function
+	h->less = less; //comparison function
 	h->aux = aux;
 
 	if (h->buckets != NULL) {
@@ -248,7 +248,7 @@ hash_bytes (const void *buf_, size_t size) {
 
 	ASSERT (buf != NULL);
 
-	hash = FNV_64_BASIS;
+	hash = FNV_64_BASIS; //초기값
 	while (size-- > 0)
 		hash = (hash * FNV_64_PRIME) ^ *buf++;
 
