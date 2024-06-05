@@ -67,6 +67,7 @@ struct page {
 struct frame {
 	void *kva; /*커널 virtual address*/
 	struct page *page; /*페이지 구조*/
+	/*---------added for Project 3-------*/
 	struct list_elem frame_elem;
 };
 
@@ -90,7 +91,7 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
-	struct hash pages;
+	struct hash spt_hash;
 };
 
 #include "threads/thread.h"
@@ -117,7 +118,11 @@ enum vm_type page_get_type (struct page *page);
 
 
 unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED);
+bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
+static bool insert_page(struct hash *hash, struct page *page);
+static bool delete_page(struct hash *hash, struct page *page); 
 
-bool page_less (const struct hash_elem *p_, void *aux UNUSED);
+static struct list frame_table;
+static struct list_elem *ft_start;
 
 #endif  /* VM_VM_H */

@@ -143,17 +143,18 @@ page_fault(struct intr_frame *f)
 	user = (f->error_code & PF_U) != 0;
 
 	/* NOTE: [2.4] 페이지 폴트 발생 시 exit(-1) 호출 */
-	exit(-1);
+	// exit(-1);
 
 #ifdef VM
 	/* For project 3 and later. */
 	if (vm_try_handle_fault(f, fault_addr, user, write, not_present))
 		return;
 #endif
-
-	/* Count page faults. */
-	page_fault_cnt++;
-
+	/*page fault handler가 성공적으로 처리하지 못했을 경우 exit(-1) 호출되어 프로그램이 종료되도록*/
+	
+	page_fault_cnt++; /* Count page faults. */
+	
+	exit(-1);
 	/* If the fault is true fault, show info and exit. */
 	printf("Page fault at %p: %s error %s page in %s context.\n",
 		   fault_addr,
