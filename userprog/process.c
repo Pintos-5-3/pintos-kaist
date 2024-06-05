@@ -78,10 +78,12 @@ static void
 initd(void *f_name)
 {
 #ifdef VM
+	printf("여기로 오겠지? 아마\n");
 	supplemental_page_table_init(&thread_current()->spt);
+	printf("통과할진 모르겠은\n");
 #endif
 	process_init();
-
+	
 	if (process_exec(f_name) < 0)
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED();
@@ -214,6 +216,7 @@ error:
  */
 int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 {
+	printf("실행파일 이름? %s\n",f_name);
 	char *token, *saveptr;
 	char *file_name = strtok_r(f_name, " ", &saveptr);
 	bool success;
@@ -232,6 +235,11 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
 	struct intr_frame _if;
+
+	// project 3 구현
+	memset (&_if, 0, sizeof _if); // 인터럽트 프레임 0으로 초기화
+	// project 3 구현 끝
+
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
@@ -241,16 +249,22 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 
 	lock_acquire(&filesys_lock);
 	/* And then load the binary */
+	printf("이름이 이상한가? %s\n",file_name);
 	success = load(file_name, &_if);
+	printf("성공여부? %d\n",success);
+
 	lock_release(&filesys_lock);
 
 	/* NOTE: [2.3] 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
 	// sema_up(&thread_current()->load_sema);
 
 	/* If load failed, quit. */
+
+	// printf("이름이 이상한가? %s\n",f_name);
 	palloc_free_page(f_name);
 	if (!success)
 	{
+		printf("설마 실패?\n");
 		free(parse);
 		return -1;
 	}
@@ -356,6 +370,9 @@ void process_exit(void)
 	for (int idx = 2; idx < FDT_MAX; idx++)
 		file_close(process_get_file(idx));
 	palloc_free_page(curr->fdt);
+	/*pjt3   해시테이블 삭제 */ 
+	// hash_destroy(curr->spt->page_table);
+
 	process_cleanup();
 
 	/* NOTE: [2.3] thread_exit 수정 */
@@ -528,8 +545,10 @@ load(const char *file_name, struct intr_frame *if_)
 	// hex_dump(&file_ofs, )
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create();
-	if (t->pml4 == NULL)
+	if (t->pml4 == NULL){
+		printf("pml4 문제임\n");
 		goto done;
+	}
 	process_activate(thread_current());
 
 	/* Open executable file. */
@@ -554,12 +573,16 @@ load(const char *file_name, struct intr_frame *if_)
 	{
 		struct Phdr phdr;
 
-		if (file_ofs < 0 || file_ofs > file_length(file))
+		if (file_ofs < 0 || file_ofs > file_length(file)){
+			printf("파일길이 문제임\n");
 			goto done;
+		}
 		file_seek(file, file_ofs);
 
-		if (file_read(file, &phdr, sizeof phdr) != sizeof phdr)
+		if (file_read(file, &phdr, sizeof phdr) != sizeof phdr){
+			printf("파일읽기 문제임\n");
 			goto done;
+		}
 		file_ofs += sizeof phdr;
 		switch (phdr.p_type)
 		{
@@ -573,6 +596,7 @@ load(const char *file_name, struct intr_frame *if_)
 		case PT_DYNAMIC:
 		case PT_INTERP:
 		case PT_SHLIB:
+			printf("PT_SHLIB 문제임\n");
 			goto done;
 		case PT_LOAD:
 			if (validate_segment(&phdr, file))
@@ -596,12 +620,15 @@ load(const char *file_name, struct intr_frame *if_)
 					read_bytes = 0;
 					zero_bytes = ROUND_UP(page_offset + phdr.p_memsz, PGSIZE);
 				}
-				if (!load_segment(file, file_page, (void *)mem_page,
-								  read_bytes, zero_bytes, writable))
+				if (!load_segment(file, file_page, (void *)mem_page, read_bytes, zero_bytes, writable)){
+					printf("load_segment 문제임\n");
 					goto done;
+				}
 			}
-			else
+			else{
+				printf("validate_segment 문제임\n");
 				goto done;
+			}
 			break;
 		}
 	}
@@ -610,12 +637,15 @@ load(const char *file_name, struct intr_frame *if_)
 	t->run_file = file;
 
 	/* Set up stack. */
-	if (!setup_stack(if_))
+	if (!setup_stack(if_)){
+		printf("setup_stack 문제임\n");
 		goto done;
+	}
 
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
-
+	
+	printf("이거뜨면 큰일임\n");
 	success = true;
 
 done:
@@ -701,6 +731,7 @@ static bool
 load_segment(struct file *file, off_t ofs, uint8_t *upage,
 			 uint32_t read_bytes, uint32_t zero_bytes, bool writable)
 {
+	printf("load_segment 들어옴\n");
 	ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
 	ASSERT(pg_ofs(upage) == 0);
 	ASSERT(ofs % PGSIZE == 0);
@@ -713,6 +744,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 		 * and zero the final PAGE_ZERO_BYTES bytes. */
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
 
 		/* Get a page of memory. 메모리 할당 */
 		uint8_t *kpage = palloc_get_page(PAL_USER);
@@ -734,6 +766,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 			palloc_free_page(kpage);
 			return false;
 		}
+
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;

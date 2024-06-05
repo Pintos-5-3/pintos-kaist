@@ -2,6 +2,7 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+
 #include "include/lib/kernel/hash.h"
 #include "threads/mmu.h"
 
@@ -35,6 +36,7 @@ enum vm_type {
 
 struct page_operations;
 struct thread;
+struct list frame_table;
 
 #define VM_TYPE(type) ((type) & 7)
 
@@ -50,6 +52,7 @@ struct page {
 	/* Your implementation */
 	struct hash_elem hash_elem;
 	bool writable;
+
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -68,6 +71,7 @@ struct frame {
 	void *kva; /*커널 virtual address*/
 	struct page *page; /*페이지 구조*/
 	/*---------added for Project 3-------*/
+
 	struct list_elem frame_elem;
 };
 
@@ -124,5 +128,6 @@ static bool delete_page(struct hash *hash, struct page *page);
 
 static struct list frame_table;
 static struct list_elem *ft_start;
+
 
 #endif  /* VM_VM_H */

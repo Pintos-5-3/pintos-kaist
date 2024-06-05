@@ -101,6 +101,7 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	// struct page *page = NULL;
 	/* TODO: Fill this function. */
+
 	
 	//page의 VA와 spt의 VA가 일치하는 경우 
 	struct page *temp_page = (struct page *)malloc(sizeof(struct page)); 
@@ -120,6 +121,7 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	else {
 		return NULL; //해당 페이지를 찾지 못하는 경우
 	}
+
 }
 
 /* Insert PAGE into spt with validation. 
@@ -130,7 +132,9 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	// int succ = false;
 	/* TODO: Fill this function. */
+
 	return insert_page(&spt->spt_hash, page);
+
 }
 
 void
@@ -144,6 +148,7 @@ static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
+
 	struct thread *cur = thread_current();
 	struct list_elem *frame_e;
 	struct list_elem *e = ft_start;
@@ -155,6 +160,7 @@ vm_get_victim (void) {
 		else	
 			return victim;
 	} 
+
 	return victim;
 }
 
@@ -179,6 +185,7 @@ vm_evict_frame (void) {
 static struct frame *
 vm_get_frame (void) {
 	/* TODO: Fill this function. */
+
 	struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
 
 	frame->kva = palloc_get_page(PAL_USER); //사용자 풀에서 메모리 할당을 위해 PAL_USER
@@ -221,11 +228,13 @@ bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
+
 	struct page *page = NULL;
 	/* TODO: Validate the fault. page fault 주소에 대한 유효성 검증*/
 	/* TODO: Your code goes here */
 	if (addr == NULL) 
 		return false;
+
 
 	//접근한 페이지의 물리적 페이지가 존재하지 않는 경우 - page fault인 경우
 	if (not_present){
@@ -302,7 +311,9 @@ vm_do_claim_page (struct page *page) {
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+
 	hash_init(&spt->spt_hash, page_hash, page_less, NULL);
+
 }
 
 /* Copy supplemental page table from src to dst 
@@ -318,6 +329,7 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 }
+
 
 /*-----------------------------------------------------------------------*/
 /*각 페이지의 가상 주소(Va)를 기반으로 해시 값 계산
@@ -351,4 +363,5 @@ static bool delete_page(struct hash *hash, struct page *page){
 		return true;
 	else 
 		return false;
+
 }

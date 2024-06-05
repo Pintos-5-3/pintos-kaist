@@ -55,6 +55,10 @@ void close(int fd);
 bool create(const char *file, unsigned initial_size);
 bool remove(const char *file);
 
+/* project 3 */
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset);
+void munmap(void *addr);
+
 void check_address(void *addr);
 
 void syscall_init(void)
@@ -122,6 +126,12 @@ void syscall_handler(struct intr_frame *f)
 		f->R.rax = tell(f->R.rdi);
 		break;
 	case SYS_CLOSE: // 13
+		close(f->R.rdi);
+		break;
+	case SYS_MMAP: // 14                   /* Map a file into memory. */
+		close(f->R.rdi);
+		break;
+	case SYS_MUNMAP: // 15                 /* Remove a memory mapping. */
 		close(f->R.rdi);
 		break;
 	}
@@ -337,4 +347,13 @@ void check_address(void *addr)
 {
 	if (addr == NULL || is_kernel_vaddr(addr))
 		exit(-1);
+}
+
+/* NOTE: [3.?] mmap() 시스템 콜 구현 */
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset){
+
+}
+/* NOTE: [3.?] munmap() 시스템 콜 구현 */
+void munmap(void *addr){
+
 }
