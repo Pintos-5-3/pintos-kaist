@@ -103,17 +103,17 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	/* TODO: Fill this function. */
 	
 	//page의 VA와 spt의 VA가 일치하는 경우 
-	struct page *temp_page = (struct page *)malloc(sizeof(struct page));
-	// struct page *temp_page; 
+	struct page *temp_page = (struct page *)malloc(sizeof(struct page)); 
 	struct hash_elem *e; 
 
 	temp_page->va = pg_round_down(va); //주어진 가상 주소 va를 포함하는 페이지의 시작 주소 return 
 	//주어진 주소를 페이지 크기 단위로 내림하여 해당 페이지의 시작 주소 구함 
-	
-	e = hash_find(&spt->spt_hash, &temp_page->hash_elem);
+
+	e = hash_find(&spt->spt_hash, &temp_page->hash_elem); //spt에서 hash값을 활용하여 페이지를 찾음 
 	
 	free(temp_page);
 
+	//일치하는 페이지를 찾았으면 해당 페이지 return
 	if (e != NULL) {
 		return hash_entry(e, struct page, hash_elem);
 	}
@@ -181,7 +181,7 @@ vm_get_frame (void) {
 	/* TODO: Fill this function. */
 	struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
 
-	frame->kva = palloc_get_page(PAL_USER);
+	frame->kva = palloc_get_page(PAL_USER); //사용자 풀에서 메모리 할당을 위해 PAL_USER
 
 	if (frame == NULL || frame->kva == NULL) {
 		PANIC("TODO");
@@ -189,11 +189,11 @@ vm_get_frame (void) {
 		// frame = vm_evict_frame();
 		// frame->page = NULL;
 		// return frame;
-
 	}
 
 	list_push_back(&frame_table, &frame->frame_elem);
-	frame->page = NULL;
+	
+	frame->page = NULL; //물리 프레임을 할당받고 아직 매핑된 가상 페이지는 없으니까 NULL로 초기 설정을 해준다. 
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
 
