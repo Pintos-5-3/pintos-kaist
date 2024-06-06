@@ -904,7 +904,7 @@ setup_stack(struct intr_frame *if_)
 {
 	bool success = false;
 
-	/* stack 아래로 성장 -> USER_STACK에서 PGSIZE만큼 내린 지점에서 페이지를 생성함 */
+	/* stack 아래로 성장 -> USER_STACK(스택의 시작점)에서 PGSIZE만큼 내린 지점에서 페이지를 생성함 */
 	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
 	
 
@@ -914,9 +914,11 @@ setup_stack(struct intr_frame *if_)
 	/* TODO: Your code goes here */
 	
 	/* 
-	- stack_bottom에 스택을 매핑하고 해당 페이지를 즉시 할당 - lazy하지 않게 할당
+	첫 번째 스택 페이지는 lazy loading할 필요가 없음 
+	=> page fault가 발생할 때까지 기다릴 필요가 없이 바로 물리 프레임 할당
+	- stack_bottom에 스택을 매핑하고 해당 페이지를 즉시 할당
 	- 성공했다면 rsp(스택 포인터)를 적절한 위치로 설정
-	- 해당 페이지가 stack임을 표시하라  	
+	- 해당 페이지가 stack임을 표시하라 - VM_MARKER_0
 	*/
 	
 	/*
