@@ -150,7 +150,11 @@ vm_get_victim (void) {
 
 	for (frame_e = list_begin(&frame_table); frame_e != list_end(&frame_table); frame_e = list_next(frame_e)){
 		victim = list_entry(frame_e, struct frame, frame_elem);
+
+		//현재 쓰레드의 페이지 테이블에서 victim 페이지가 접근된 페이지인지 확인
 		if (pml4_is_accessed(cur->pml4, victim->page->va))
+			//만약 접근된 페이지라면 접근 플래그를 0으로 설정.
+			//다음번 탐색에서 victim으로 선택될 수 있도록 한다. 
 			pml4_set_accessed(cur->pml4, victim->page->va, 0);
 		else	
 			return victim;
@@ -306,17 +310,62 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 }
 
 /* Copy supplemental page table from src to dst 
-src에서 dct까지의 spt 복사 */
+src에서 dst까지의 spt 복사 */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
+			
+	
+	//해쉬 테이블을 순회하기 위한 hash_iterator i
+	struct hash_iterator i;
+	//해쉬 테이블의 첫 번쨰 요소 가리키도록 i 초기화
+	hash_first(&i, &src->spt_hash); 
+
+	//spt 테이블의 모든 요소 순회 
+	while(hash_next(&i)) {
+		//src_page => 현재 i가 가리키고 있는 hash_elem의 struct page 
+		struct page *src_page = hash_entry(hash_cur(&i), struct page, hash_elem);
+		enum vm_type type = src_page->operations->type; 
+		void *upage = src_page->va;
+		bool writable = src_page->writable;
+
+
+		//UNINIT type인 경우
+		// - init, aux는 lazy loading에 필요 
+		if (type == VM_UNINIT) {
+			vm_initializer *init = src_page->uninit.init;
+			void *aux = src_page->uninit.aux;
+			vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+			continue;
+		}
+
+		//UNINIT type이 아닌 경우
+		// - init, aux는 lazy loading에 필요한 것이므로 필요하지 않다.
+		// 이미 type이 UNINIT이 아님
+		// 지금 생성하는 페이지는 lazy loading이 아니라 바로 load할 것임
+		if (!vm_alloc_page(type, upage, writable)){
+			return false;
+		}
+
+		if (!vm_claim_page(upage))
+			return false;
+		
+		struct page *dst_page = spt_find_page(dst, upage);
+		memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+	}
+
+	return true ;
 }
 
-/* Free the resource hold by the supplemental page table */
+/* Free the resource hold by the supplemental page table */\
+/* 프로세스가 종료될 때(process_exit)와 실행될 떄(process_exec) 
+   process_cleanup()에서 실행됨 */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+	
+	hash_clear(&spt->spt_hash, hash_page_destroy);
 }
 
 /*-----------------------------------------------------------------------*/
@@ -351,4 +400,14 @@ static bool delete_page(struct hash *hash, struct page *page){
 		return true;
 	else 
 		return false;
+}
+
+/* page type에 맞는 destroy 함수 호출
+	- uninit_destroy / anon_destroy 함수 
+*/
+void hash_page_destroy(struct hash_elem *e, void *aux){
+	struct page *page = hash_entry(e, struct page, hash_elem);
+
+	destroy(page); //페이지 제거 
+	free(page); //메모리 해제
 }
