@@ -126,8 +126,10 @@ bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *au
 static bool insert_page(struct hash *hash, struct page *page);
 static bool delete_page(struct hash *hash, struct page *page); 
 
-static struct list frame_table;
+struct list frame_table;
 static struct list_elem *ft_start;
 
+void hash_page_destroy(struct hash_elem *e, void *aux);
+// static void vm_stack_growth (void *addr UNUSED);
 
 #endif  /* VM_VM_H */
