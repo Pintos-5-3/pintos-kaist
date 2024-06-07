@@ -187,6 +187,7 @@ vm_get_frame (void) {
 
 	frame->kva = palloc_get_page(PAL_USER); //사용자 풀에서 메모리 할당을 위해 PAL_USER
 
+	//frame 할당에 실패 or 물리 페이지 프레임 할당에 실패하는 경우 
 	if (frame == NULL || frame->kva == NULL) {
 		PANIC("TODO");
 		return NULL;
@@ -195,18 +196,28 @@ vm_get_frame (void) {
 		// return frame;
 	}
 
+	//할당받은 frame을 frame_table 리스트의 끝에 추가한다.
 	list_push_back(&frame_table, &frame->frame_elem);
 	
 	frame->page = NULL; //물리 프레임을 할당받고 아직 매핑된 가상 페이지는 없으니까 NULL로 초기 설정을 해준다. 
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
 
-	return frame;
+	return frame; //초기화된 frame return
 }
 
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	struct thread *cur = thread_current;
+
+	//Todo - 인자로 addr이 들어가야 하는가 아니면 pg_round_down(addr)?
+
+	//VM_ANON => stack은 파일 시스템에 직접 매핑되지 않는 메모리 영역 
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, addr , 1)){
+		// vm_claim_page(addr); //할당된 페이지와 실제 물리 메모리 매핑
+		cur->stack_bottom -= PGSIZE;
+	}
 }
 
 /* Handle the fault on write_protected page */
@@ -217,7 +228,12 @@ vm_handle_wp (struct page *page UNUSED) {
 /* Return true on success */
 /* 
 page_fault로 부터 넘어온 인자
-- not_present: 페이지 존재하지 않음(bogus fault)
+- f: page fault 예외가 발생할 때 실행되던 context 정보가 담겨있는 interrupt frame 
+- addr:
+	page fault가 발생할 때 접근한 va. 
+- not_present: 
+	true: addr에 매핑된 physical page가 존재하지 않음
+	false: read only page에 writing 작업을 하려는 시도
 - user: user에 의한 접근(true), 커널에 의한 접근(false)
 - write: 쓰기 목적 접근(true), 읽기 목적 접근(false)
 */
@@ -227,24 +243,57 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault. page fault 주소에 대한 유효성 검증*/
-	/* TODO: Your code goes here */
+
+	static void *STACK_MINIMUM_ADDR = USER_STACK - (1<<20); /* 스택이 확장될 수 있는 최하단 경계 주소
+	1 << 20: 2의 20승 => 1MB (0x100000)
+	스택의 최소 주소 - USER_STACK - (1MB) => 사용자 스택의 최상위 주소  - (1MB) */
+
+	//page fault가 나는 주소 addr == NULL인 경우
 	if (addr == NULL) 
 		return false;
 
-	//접근한 페이지의 물리적 페이지가 존재하지 않는 경우 - page fault인 경우
+	/*접근한 가상 주소 va가 커널 주소인 경우 - return false
+	사용자 프로그램이 커널 주소 공간에 접근하는 것을 막음
+	사용자 요청에 의한 fault 또한 처리 불가 - return false */
+	if (is_kernel_vaddr(addr))
+		return false; 
+
+	//not_present true => page fault가 발생한 경우
+	//접근한 페이지의 물리적 페이지가 존재하지 않는 경우 
 	if (not_present){
+		struct thread *cur = thread_current();
+
+		// void *rsp =! user ? cur->rsp : f->rsp;
+		/* 1. user mode 에서 page fault
+			- intr_frame의 rsp에 현재 사용자 스택의 rsp, 스택 포인터가 저장되어 있을 것
+		   2. kernel mode 에서 page fault
+		   	- 커널 모드에서 intr_frame의 rsp에는 커널 스택의 rsp가 저장되어 있을 것
+			- 따라서 사용자 모드에서 커널 모드로 전환될 떄 thread 구조체에 rsp를 저장해서 불러온다. 	(syscall_handler) 
+		*/
+		void *rsp = is_kernel_vaddr(f->rsp) ? cur->rsp : f->rsp; 
+
+		if (rsp - 8 <= addr && STACK_MINIMUM_ADDR <= addr && addr <= USER_STACK){
+			vm_stack_growth(pg_round_down(addr)); //stack growth
+		}
+
 		page = spt_find_page(spt, addr); //spt에서 addr와 일치하는 page가 있는지 찾기
 
+		//page를 찾지 못하는 경우
 		if (page == NULL){
 			return false;
 		}
 
+		//쓰기 요청인데 페이지가 쓰기 불가능한 경우
 		if (write && !page->writable) {
 			return false;
 		}
-		return vm_do_claim_page (page);
+		//page를 claim하지 못한 경우 - addr와 kva 물리 메모리 프레임을 매핑하지 못한 경우 
+		if (!vm_do_claim_page (page)) {
+			return false;
+		}
+		//모든 조건을 만족하면 return true
+		return true;
 	}
-
 	return false;
 }
 
@@ -285,21 +334,27 @@ vm_claim_page (void *va UNUSED) {
 static bool
 vm_do_claim_page (struct page *page) {
 
+	//page가 유효하지 않거나, 이미 page->frame (물리 프레임이 할당되었을 경우)
 	if (!page || page->frame) {
 		return false;
 	}
 
+	//사용 가능한 물리 frame 할당 받음
 	struct frame *frame = vm_get_frame ();
 
-	/* Set links */
+	/* Set links 
+	: frame과 page 객체간의 연결 설정 
+	-> page도 frame을 사용하게 되고 frame도 해당 page에 대한 정보를 가질 수 있게끔*/
 	frame->page = page;
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	struct thread *cur = thread_current();
+	//현재 쓰레드의 pml4 페이지 테이블에 새로운 PTE 삽입
 	pml4_set_page(cur->pml4, page->va, frame->kva, page->writable);
  
-	//swap-in을 통해서 디스크의 스왑 영역에서 물리 메모리 프레임으로 load -> 스왑 작업 성공 여부 boolean 리턴
+	//swap-in을 통해서 디스크의 스왑 영역에서 물리 메모리 프레임으로 load 
+	//-> 스왑 작업 성공 여부 boolean 리턴
 	return swap_in(page, frame->kva);
 }
 

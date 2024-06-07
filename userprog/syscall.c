@@ -80,6 +80,14 @@ void syscall_handler(struct intr_frame *f)
 	/* TODO: [2.5] fork 추가 */
 	uint64_t syscall_num = f->R.rax;
 
+#ifdef VM	
+	thread_current()->rsp = f->rsp; 
+	/*
+	현재 실행 중인 쓰레드의 rsp 필드의 인터럽트 프레임의 rsp 값 저장
+	커널 모드로 전환되기 전에 사용자 모드의 스택 포인터를 Thread 구조체에 저장하게 된다.
+	-> 커널 모드 작업을 마치고 다시 사용자 모드로 돌아갈 때 정확하게 사용자 모드의 스택 상태로 복원 가능
+	*/
+#endif 
 	switch (syscall_num)
 	{
 	case SYS_HALT: // 0
@@ -337,4 +345,7 @@ void check_address(void *addr)
 {
 	if (addr == NULL || is_kernel_vaddr(addr))
 		exit(-1);
+	/* --------------------------------- */
+	struct thread *cur = thread_current();
+	return spt_find_page(&cur->spt, addr);
 }
