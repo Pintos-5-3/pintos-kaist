@@ -334,7 +334,7 @@ bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
 	// memcpy(&dst->spt_hash,&src->spt_hash,sizeof(struct hash));
-	return true;
+	//return true;
 	struct hash_iterator i;
     hash_first(&i, &src->spt_hash);
     while (hash_next(&i))
