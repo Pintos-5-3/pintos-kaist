@@ -23,4 +23,8 @@ struct lazy_load_arg {
     size_t zero_bytes;    
 };
 
+
+bool
+lazy_load_segment(struct page *page, void *aux);
+
 #endif /* userprog/process.h */

@@ -16,6 +16,7 @@
 #include "userprog/process.h"
 #include "devices/input.h"
 #include "threads/palloc.h"
+#include "include/vm/vm.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -131,6 +132,13 @@ void syscall_handler(struct intr_frame *f)
 		break;
 	case SYS_CLOSE: // 13
 		close(f->R.rdi);
+		break;
+	/*---------VM----------*/
+	case SYS_MMAP: 
+		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+		break;	
+	case SYS_MUNMAP:
+		munmap(f->R.rdi);
 		break;
 	}
 }
@@ -348,4 +356,43 @@ void check_address(void *addr)
 	/* --------------------------------- */
 	struct thread *cur = thread_current();
 	return spt_find_page(&cur->spt, addr);
+}
+
+
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
+
+	//offset != pg_round_down(offset) 
+	//offset이 페이지의 경계에 정확하게 맞춰지지 않았을 경우
+	if (offset % PGSIZE != 0) {
+		return NULL;
+	}
+
+	//매핑하려는 페이지가 이미 spt에 존재하는 경우
+	if (spt_find_page(&thread_current()->spt, addr)){
+		return NULL;
+	}
+
+	if (addr == 0 || is_kernel_vaddr(addr) || !is_user_vaddr(addr + length) || addr != pg_round_down(addr)){
+		return NULL;
+	}
+
+	struct file *f = process_get_file(fd);
+
+	//fd로 열린 파일의 길이가 0바이트인 경우
+	if (file_length(f) == 0 || (int)length <= 0 || f == NULL){
+		return NULL;
+	}
+
+	if (fd == 0 || fd == 1){
+		return NULL;
+	}
+
+	return do_mmap(addr, length, writable, f, offset);
+}
+
+
+
+
+void munmap (void *addr){
+	do_munmap(addr);
 }

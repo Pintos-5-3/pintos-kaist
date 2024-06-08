@@ -216,7 +216,9 @@ vm_stack_growth (void *addr UNUSED) {
 	//VM_ANON => stack은 파일 시스템에 직접 매핑되지 않는 메모리 영역 
 	if (vm_alloc_page(VM_ANON | VM_MARKER_0, addr , 1)){
 		// vm_claim_page(addr); //할당된 페이지와 실제 물리 메모리 매핑
-		cur->stack_bottom -= PGSIZE;
+
+		cur->stack_bottom -= PGSIZE; 
+		//stack_bottom을 한 페이지 크기만큼 내림 -> 새로운 페이지가 스택에 추가되어 아래로 성장
 	}
 }
 
