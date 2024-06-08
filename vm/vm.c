@@ -173,7 +173,7 @@ vm_get_frame (void) {
 
 	// frame 구조체 초기화
 	frame->kva = kva;
-	// frame->page = NULL;		// <= 이거 하면 밑에 ASSERT 걸리지 않나?
+	frame->page = NULL;
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -196,11 +196,22 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
-	/* TODO: Validate the fault */
+	if(addr == NULL || is_kernel_vaddr(addr)) {		// addr이 유효한지 확인
+		return false;
+	}
+	if(not_present) {		// 유효한 페이지 폴트(단순히 물리 메모리에 올라와있지 않은 페이지에 접근한 경우)
+		/* TODO: Validate the fault */
+		page = spt_find_page(spt, addr);
+		if(page == NULL) {			// 페이지가 존재하지 않는 경우
+			return false;
+		}
+		if(write && !page->writable) {		// read-only page에 write을 시도하는 경우
+			return false;
+		}
+		return vm_do_claim_page(page);		// page에 물리 frame을 할당
+	}
 
-	/* TODO: Your code goes here */
-
-	return vm_do_claim_page (page);
+	return false;			// 그 외에는 진짜 page fault(유효하지 않은 페이지에 접근하는 등의 경우)이므로 false
 }
 
 /* Free the page.
@@ -238,7 +249,7 @@ vm_do_claim_page (struct page *page) {
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	struct thread *cur = thread_current();
-	pml4_set_page(cur->pml4, page, frame, page->writable);
+	pml4_set_page(cur->pml4, page->va, frame->kva, page->writable);
 	// 현재 쓰레드의 page table에 현재 연결한 page와 frame에 대한 정보를 담음
 
 	return swap_in (page, frame->kva);		// swap in을 하며 끝남

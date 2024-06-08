@@ -15,4 +15,11 @@ int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
 void process_close_file(int fd);
 
+struct lazy_load_aux {  // load_segment -> lazy_load_segment로 넘길 인자 구조체
+    struct file *file;          // 내용이 담긴 파일
+    off_t ofs;                  // 파일에서 읽기 시작할 위치
+    uint32_t read_bytes;        // 페이지에서 읽어야하는 바이트 수
+    uint32_t zero_bytes;        // 페이지에서 읽고 난 후 남은 공간으로, 0으로 채워야 하는 바이트 수
+};
+
 #endif /* userprog/process.h */
