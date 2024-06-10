@@ -445,7 +445,9 @@ void process_close_file(int fd)
 		return;
 	struct thread *curr = thread_current();
 	struct file *file = process_get_file(fd);
+	// lock_acquire(&filesys_lock);
 	file_close(file);
+	// lock_release(&filesys_lock);
 	/* 파일 디스크립터 테이블 해당 엔트리 초기화*/
 	curr->fdt[fd] = NULL;
 }
@@ -532,8 +534,11 @@ load(const char *file_name, struct intr_frame *if_)
 		goto done;
 	process_activate(thread_current());
 
+	// lock_acquire(&filesys_lock);
 	/* Open executable file. */
 	file = filesys_open(file_name);
+	// lock_release(&filesys_lock);
+
 	if (file == NULL)
 	{
 		printf("load: %s: open failed\n", file_name);

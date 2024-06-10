@@ -262,7 +262,20 @@ int filesize(int fd)
 /* NOTE: [2.4] read() 시스템 콜 구현 */
 int read(int fd, void *buffer, unsigned size)
 {
-	check_address(buffer);
+	// check_address(buffer);
+	/*--------------------------*/
+	struct page *page = spt_find_page(&thread_current()->spt, buffer);
+	if (page){
+		if (!page->writable) {
+			exit(-1);
+		}
+	}
+
+	if (!is_user_vaddr(buffer) || buffer == NULL){
+		exit(-1);
+	}
+	/*--------------------------*/
+
 
 	/* 파일에 동시 접근이 일어날 수 있으므로 Lock 사용 */
 	lock_acquire(&filesys_lock);
@@ -372,14 +385,18 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 		return NULL;
 	}
 
-	if (addr == 0 || is_kernel_vaddr(addr) || !is_user_vaddr(addr + length) || addr != pg_round_down(addr)){
+	if (!addr || is_kernel_vaddr(addr) || !is_user_vaddr(addr + length) || addr != pg_round_down(addr)){
 		return NULL;
 	}
 
 	struct file *f = process_get_file(fd);
 
+	if (f == NULL){
+		return NULL;
+	}
+
 	//fd로 열린 파일의 길이가 0바이트인 경우
-	if (file_length(f) == 0 || (int)length <= 0 || f == NULL){
+	if (file_length(f) == 0 || (int)length <= 0) {
 		return NULL;
 	}
 

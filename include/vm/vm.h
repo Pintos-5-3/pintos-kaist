@@ -4,6 +4,7 @@
 #include "threads/palloc.h"
 #include "include/lib/kernel/hash.h"
 #include "threads/mmu.h"
+#include "threads/synch.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -126,5 +127,6 @@ void hash_page_destroy(struct hash_elem *e, void *aux);
 
 static struct list frame_table;
 static struct list_elem *ft_start;
+struct lock spt_lock;
 
 #endif  /* VM_VM_H */

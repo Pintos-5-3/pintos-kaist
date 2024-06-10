@@ -3,6 +3,7 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "userprog/process.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -17,6 +18,7 @@ vm_init (void) {
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
 	list_init(&frame_table);
+	lock_init(&spt_lock);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -387,7 +389,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		bool writable = src_page->writable;
 
 
-		//UNINIT type인 경우
+		//UNINIT type인 경우(초기화되지 않은 VM_UNINT 페이지)
 		// - init, aux는 lazy loading에 필요 
 		if (type == VM_UNINIT) {
 			vm_initializer *init = src_page->uninit.init;
@@ -396,7 +398,26 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 			continue;
 		}
 
-		//UNINIT type이 아닌 경우
+		//VM_FILE type인 경우 
+		if (type == VM_FILE){
+			struct lazy_load_arg *lazy_load_arg = malloc(sizeof(struct lazy_load_arg));
+			lazy_load_arg->file = src_page->file.file;
+			lazy_load_arg->ofs = src_page->file.ofs;
+			lazy_load_arg->read_bytes = src_page->file.read_bytes;
+			lazy_load_arg->zero_bytes = src_page ->file.zero_bytes;
+
+			if (!vm_alloc_page_with_initializer(type, upage, writable, NULL,lazy_load_arg))
+				return false;
+			
+			struct page *file_page = spt_find_page(dst, upage);
+			file_backed_initializer(file_page, type, NULL);
+			file_page->frame = src_page->frame;
+			pml4_set_page(thread_current()->pml4, file_page->va, src_page->frame->kva, src_page-> writable);
+			continue;
+		}
+
+
+		//UNINIT, VM_FILE type이 아닌 경우
 		// - init, aux는 lazy loading에 필요한 것이므로 필요하지 않다.
 		// 이미 type이 UNINIT이 아님
 		// 지금 생성하는 페이지는 lazy loading이 아니라 바로 load할 것임
