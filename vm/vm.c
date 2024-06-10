@@ -78,12 +78,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		// page의 writable 변수를 입력받은 인자로 바꿔준다.
 
 		/* TODO: Insert the page into the spt. */
-		if(spt_insert_page(spt, page)) {		// 현재 쓰레드의 spt에 생성한 page를 넣어준다.
-			return true;
-		}
-		else {
-			return false;
-		}
+		return spt_insert_page(spt, page); 		// 현재 쓰레드의 spt에 생성한 page를 넣어준다.
 	}
 err:
 	return false;
@@ -183,6 +178,11 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	// 스택의 크기를 증가시키기 위해 anonymous page를 하나 이상 할당하여 인자로 받은 주소(addr)가
+	// 더 이상 예외 주소(faulted address)가 되지 않도록 한다.
+	// 할당할 때 addr을 PGSIZE로 내림처리한다.
+	vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), 1);
+	// VM_MARKER_0 : 현재 페이지가 스택을 위한 페이지임을 알림
 }
 
 /* Handle the fault on write_protected page */
@@ -196,11 +196,30 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
-	if(addr == NULL || is_kernel_vaddr(addr)) {		// addr이 유효한지 확인
+	if(addr == NULL) {	// addr이 유효한지 확인
 		return false;
 	}
+	if(is_kernel_vaddr(addr)) {		// addr이 kernel 영역의 주소인지 확인
+		return false;
+	}
+
 	if(not_present) {		// 유효한 페이지 폴트(단순히 물리 메모리에 올라와있지 않은 페이지에 접근한 경우)
 		/* TODO: Validate the fault */
+		void *rsp = f->rsp;			// user mode에서의 접근이라면 rsp는 user stack을 가리킨다.
+		if(!user) {					// kernel mode에서의 접근이라면 rsp는 kernel stack을 가리키므로
+			rsp = thread_current()->rsp;		// thread에서 가져와야 한다.
+		}
+
+		// stack growth로 해결이 가능한 fault라면 vm_stack_growth를 호출하여 해결한다.
+		if(USER_STACK - (1 << 20) <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK) {
+			// PUSH instruction 인 경우를 대비하여 rsp - 8 까지는 허용
+			vm_stack_growth(addr);
+		}
+		else if(USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK) {
+			// 일반적으로 허용되는 addr의 위치
+			vm_stack_growth(addr);
+		}
+
 		page = spt_find_page(spt, addr);
 		if(page == NULL) {			// 페이지가 존재하지 않는 경우
 			return false;
@@ -265,7 +284,46 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
+	struct hash_iterator i;				// spt_hash를 순회하기 위한 반복자
+	hash_first(&i, &src->spt_hash);		// spt_hash의 맨 앞 원소를 가리키게 함
+	while(hash_next(&i)) {
+		// src_page 정보
+		struct page *src_page = hash_entry(hash_cur(&i), struct page, hash_elem);
+		enum vm_type type = src_page->operations->type;
+		void *upage = src_page->va;
+		bool writable = src_page->writable;
 
+		// type이 uninit인 경우
+		if(type == VM_UNINIT) {		// uninit page 생성 및 초기화
+			vm_initializer *init = src_page->uninit.init;
+			void *aux = src_page->uninit.aux;
+			vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+			continue;
+		}
+
+		// type이 uninit이 아니면
+		if(!vm_alloc_page(type, upage, writable)) {	// uninit page 생성 및 알맞게 초기화
+			// init과 aux는 lazy loading에 필요하고
+			// 지금 만드는 페이지는 기다리지 않고 바로 내용을 넣어줄 것이므로 필요없음
+			return false;
+		}
+
+		// vm_claim_page로 요청해서 매핑 및 페이지 타입에 맞게 초기화
+		if(!vm_claim_page(upage)) {
+			return false;
+		}
+
+		// 매핑된 프레임에 내용 로딩
+		struct page *dst_page = spt_find_page(dst, upage);
+		memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+	}
+	return true;
+}
+
+void hash_page_destroy(struct hash_elem *e, void *aux) {
+	struct page *page = hash_entry(e, struct page, hash_elem);
+	destroy(page);
+	free(page);
 }
 
 /* Free the resource hold by the supplemental page table */
@@ -273,7 +331,7 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
-
+	hash_clear(&spt->spt_hash, hash_page_destroy);
 }
 
 // project3 memory management (hash 초기화를 위한 함수)
@@ -300,3 +358,4 @@ bool page_insert(struct hash *h, struct page *p) {
 bool page_delete(struct hash *h, struct page *p) {
 	return hash_delete(h, &p->hash_elem);
 }
+

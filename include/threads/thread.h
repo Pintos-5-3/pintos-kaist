@@ -147,6 +147,7 @@ struct thread
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	void *rsp;				// page fault시 stack growth를 위한 stack top(rsp) 변수
 #endif
 
 	/* Owned by thread.c. */

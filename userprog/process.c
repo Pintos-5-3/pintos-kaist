@@ -790,7 +790,7 @@ lazy_load_segment(struct page *page, void *aux)
 	file_seek(lazy_load_aux->file, lazy_load_aux->ofs);
 	// 파일에서 프레임으로 read_bytes만큼 데이터를 읽어옴
 	if(file_read(lazy_load_aux->file, page->frame->kva, lazy_load_aux->read_bytes) !=
-		(int)lazy_load_aux->read_bytes) {
+		(int)(lazy_load_aux->read_bytes)) {
 			palloc_free_page(page->frame->kva);		// 실패하면 frame을 free 시키고
 			return false;							// false를 return
 	}
@@ -845,9 +845,13 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 		struct lazy_load_aux *aux = (struct lazy_load_aux *)malloc(sizeof(struct lazy_load_aux));
 		aux->file = file;
+		// 내용이 담긴 파일 객체
 		aux->ofs = ofs;
+		// 이 페이지에서 파일을 읽기 시작할 위치
 		aux->read_bytes = page_read_bytes;
+		// 이 페이지에서 읽어야 하는 바이트 수
 		aux->zero_bytes = page_zero_bytes;
+		// 이 페이지에서 read_bytes 만큼 읽고 공간이 남아 0으로 채워야 하는 바이트 수
 		
 		// vm_alloc_page_with_initializer 함수를 호출하여 대기 중인 객체를 생성한다.
 		if (!vm_alloc_page_with_initializer(VM_ANON, upage,
@@ -870,6 +874,7 @@ setup_stack(struct intr_frame *if_)
 {
 	bool success = false;
 	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
+	// stack은 아래로 성장하므로 USER_STACK에서 PGSIZE 만큼 아래로 내린 지점에서 페이지를 생성한다.
 
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
