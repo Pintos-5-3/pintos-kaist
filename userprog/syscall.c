@@ -17,6 +17,8 @@
 #include "devices/input.h"
 #include "threads/palloc.h"
 
+#include "vm/vm.h"
+
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
 
@@ -131,10 +133,11 @@ void syscall_handler(struct intr_frame *f)
 		close(f->R.rdi);
 		break;
 	case SYS_MMAP: // 14                   /* Map a file into memory. */
-		close(f->R.rdi);
+		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
 		break;
 	case SYS_MUNMAP: // 15                 /* Remove a memory mapping. */
-		close(f->R.rdi);
+		munmap(f->R.rdi);
+		// close(f->R.rdi);
 		break;
 	}
 }
@@ -258,8 +261,17 @@ int filesize(int fd)
 /* NOTE: [2.4] read() 시스템 콜 구현 */
 int read(int fd, void *buffer, unsigned size)
 {
-	check_address(buffer);
+	// check_address(buffer);
+	struct page *page = spt_find_page(&thread_current()->spt, buffer);
+	if (page){
+		if (!page->writable) {
+			exit(-1);
+		}
+	}
 
+	if (!is_user_vaddr(buffer) || buffer == NULL){
+		exit(-1);
+	}
 	/* 파일에 동시 접근이 일어날 수 있으므로 Lock 사용 */
 	lock_acquire(&filesys_lock);
 	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
@@ -353,9 +365,28 @@ void check_address(void *addr)
 
 /* NOTE: [3.?] mmap() 시스템 콜 구현 */
 void *mmap(void *addr, size_t length, int writable, int fd, off_t offset){
+	if (!addr || addr != pg_round_down(addr))
+        return NULL;
 
+    if (offset != pg_round_down(offset))
+        return NULL;
+
+    if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length))
+        return NULL;
+
+    if (spt_find_page(&thread_current()->spt, addr))
+        return NULL;
+
+    struct file *f = process_get_file(fd);
+    if (f == NULL)
+        return NULL;
+
+    if (file_length(f) == 0 || (int)length <= 0)
+        return NULL;
+
+    return do_mmap(addr, length, writable, f, offset); // 파일이 매핑된 가상 주소 반환
 }
 /* NOTE: [3.?] munmap() 시스템 콜 구현 */
 void munmap(void *addr){
-
+	do_munmap(addr);
 }

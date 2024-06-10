@@ -4,6 +4,7 @@
 #include "vm/vm.h"
 #include "vm/inspect.h"
 #include <string.h>
+#include "userprog/process.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -245,9 +246,9 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
     {
         /* TODO: Validate the fault */
         // 페이지 폴트가 스택 확장에 대한 유효한 경우인지를 확인한다.
-        void *rsp = f->rsp; // user access인 경우 rsp는 유저 stack을 가리킨다.
-        if (!user)            // kernel access인 경우 thread에서 rsp를 가져와야 한다.
-            rsp = thread_current()->rsp;
+        // void *rsp = f->rsp; // user access인 경우 rsp는 유저 stack을 가리킨다.
+        // if (!user)            // kernel access인 경우 thread에서 rsp를 가져와야 한다.
+        //     rsp = thread_current()->rsp;
 
         // 스택 확장으로 처리할 수 있는 폴트인 경우, vm_stack_growth를 호출한다.
         if (USER_STACK - (1 << 20) <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK)
@@ -351,6 +352,22 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
             vm_initializer *init = src_page->uninit.init;
             void *aux = src_page->uninit.aux;
             vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+            continue;
+        }
+
+		if (type == VM_FILE)
+        {
+            struct lazy_load_arg *file_aux = malloc(sizeof(struct lazy_load_arg));
+            file_aux->file = src_page->file.file;
+            file_aux->ofs = src_page->file.ofs;
+            file_aux->read_bytes = src_page->file.read_bytes;
+            file_aux->zero_bytes = src_page->file.zero_bytes;
+            if (!vm_alloc_page_with_initializer(type, upage, writable, NULL, file_aux))
+                return false;
+            struct page *file_page = spt_find_page(dst, upage);
+            file_backed_initializer(file_page, type, NULL);
+            file_page->frame = src_page->frame;
+            pml4_set_page(thread_current()->pml4, file_page->va, src_page->frame->kva, src_page->writable);
             continue;
         }
 

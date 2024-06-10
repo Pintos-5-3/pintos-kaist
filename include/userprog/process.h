@@ -2,6 +2,7 @@
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
+// #include <stdbool.h>
 
 
 tid_t process_create_initd(const char *file_name);
@@ -16,11 +17,15 @@ int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
 void process_close_file(int fd);
 
+
 struct lazy_load_arg {
     struct file *file;
     off_t ofs;
     size_t read_bytes;
     size_t zero_bytes;    
 };
+#ifdef VM
+bool lazy_load_segment(struct page *page, void *aux);
+#endif
 
 #endif /* userprog/process.h */
