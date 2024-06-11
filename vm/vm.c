@@ -1,8 +1,11 @@
 /* vm.c: Generic interface for virtual memory objects. */
 
 #include "threads/malloc.h"
+#include "threads/thread.h"
+#include "threads/mmu.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "userprog/process.h"
 
 struct list frame_table;		// frame table 선언
 
@@ -97,9 +100,8 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 		page = NULL;
 		return NULL;
 	}
-	page = hash_entry(he, struct page, hash_elem);
-
-	return page;
+	free(page);
+	return hash_entry(he, struct page, hash_elem);
 }
 
 /* Insert PAGE into spt with validation. */

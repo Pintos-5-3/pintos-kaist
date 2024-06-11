@@ -3,8 +3,6 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "hash.h"
-#include "include/threads/vaddr.h"
-#include "include/threads/mmu.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -51,6 +49,8 @@ struct page {
 	/* Your implementation */
 	struct hash_elem hash_elem;		// spt에 page의 정보를 담기 위한 hash_elem
 	bool writable;							// page에 write가 가능한지 여부를 담기 위함
+
+	int mapped_page_count;		// 매핑된 페이지의 개수
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -126,5 +126,7 @@ static unsigned page_less_func (const struct hash_elem *a,
 
 bool page_insert(struct hash *h, struct page *p);
 bool page_delete(struct hash *h, struct page *p);
+
+void hash_page_destroy(struct hash_elem *e, void *aux);
 
 #endif  /* VM_VM_H */

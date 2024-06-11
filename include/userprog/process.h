@@ -22,4 +22,7 @@ struct lazy_load_aux {  // load_segment -> lazy_load_segment로 넘길 인자 �
     uint32_t zero_bytes;        // 페이지에서 읽고 난 후 남은 공간으로, 0으로 채워야 하는 바이트 수
 };
 
+static bool
+lazy_load_segment(struct page *page, void *aux);
+
 #endif /* userprog/process.h */

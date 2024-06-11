@@ -127,6 +127,12 @@ void syscall_handler(struct intr_frame *f)
 	case SYS_CLOSE: // 13
 		close(f->R.rdi);
 		break;
+	case SYS_MMAP:	// 14
+		mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+		break;
+	case SYS_MUNMAP:	// 15
+		munmap(f->R.rdi);
+		break;
 	}
 }
 
@@ -340,4 +346,32 @@ void check_address(void *addr)
 {
 	if (addr == NULL || is_kernel_vaddr(addr))
 		exit(-1);
+}
+
+/* [3.4] 메모리와 파일을 매핑시키는 함수 */
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset) {
+	if(addr == NULL) 	// addr이 비어있는 경우
+		return NULL;
+
+	if(offset != pg_round_down(offset)) 	// offset이 page-aligned 되지 않은 경우
+		return NULL;
+	
+	if(!is_user_vaddr(addr) || !is_user_vaddr(addr + length))	// addr이 user 영역이 아니거나 addr + legnth가 user 영역이 아닌 경우
+		return NULL;
+
+	if(spt_find_page(&thread_current()->spt, addr));	// addr에 할당된 page가 이미 존재하는 경우
+		return NULL;
+
+	struct file *file = process_get_file(fd);
+	if(file == NULL)	// fd에 해당하는 file이 존재하지 않는 경우
+		return NULL;
+
+	if(file_length(file) == 0 || (int)length <= 0)	// fd로 열린 파일의 길이가 0바이트거나 읽으려는 길이가 0 이하인 경우
+		return NULL;
+	
+	return do_mmap(addr, length, writable, file, offset);
+}
+
+void munmap(void *addr) {
+
 }
