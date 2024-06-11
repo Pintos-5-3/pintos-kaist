@@ -18,6 +18,7 @@ vm_init (void) {
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
 	list_init(&frame_table);
+	lock_init(&frame_table_lock);
 	lock_init(&spt_lock);
 }
 
@@ -132,13 +133,18 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	// int succ = false;
 	/* TODO: Fill this function. */
-	return insert_page(&spt->spt_hash, page);
+	lock_acquire(&spt_lock);
+	bool success = insert_page(&spt->spt_hash, page);
+	lock_release(&spt_lock);
+	return success;
 }
 
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
+	lock_acquire(&spt_lock);
 	vm_dealloc_page (page);
-	return true;
+	lock_release(&spt_lock);
+	return ;
 }
 
 /* Get the struct frame, that will be evicted. */
@@ -170,7 +176,8 @@ static struct frame *
 vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
-	swap_out(victim->page);
+	if (victim->page)
+		swap_out(victim->page);
 
 	return victim;
 }
@@ -191,15 +198,17 @@ vm_get_frame (void) {
 
 	//frame 할당에 실패 or 물리 페이지 프레임 할당에 실패하는 경우 
 	if (frame == NULL || frame->kva == NULL) {
-		PANIC("TODO");
-		return NULL;
-		// frame = vm_evict_frame();
-		// frame->page = NULL;
-		// return frame;
+		// PANIC("TODO");
+		// return NULL;
+		frame = vm_evict_frame();
+		frame->page = NULL;
+		return frame;
 	}
 
+	lock_acquire(&frame_table_lock);
 	//할당받은 frame을 frame_table 리스트의 끝에 추가한다.
 	list_push_back(&frame_table, &frame->frame_elem);
+	lock_release(&frame_table_lock);
 	
 	frame->page = NULL; //물리 프레임을 할당받고 아직 매핑된 가상 페이지는 없으니까 NULL로 초기 설정을 해준다. 
 	ASSERT(frame != NULL);

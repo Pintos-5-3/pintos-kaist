@@ -56,7 +56,8 @@ void close(int fd);
 bool create(const char *file, unsigned initial_size);
 bool remove(const char *file);
 
-void check_address(void *addr);
+struct page *check_address(void *addr);
+void check_valid_buffer(void *buffer, unsigned size, void *rsp, bool writable) ;
 
 void syscall_init(void)
 {
@@ -72,6 +73,7 @@ void syscall_init(void)
 
 	/* NOTE: [2.4] filesys_lock 초기화 */
 	lock_init(&filesys_lock);
+	lock_init(&filesys_lock2);
 }
 
 /* The main system call interface */
@@ -119,9 +121,11 @@ void syscall_handler(struct intr_frame *f)
 		f->R.rax = filesize(f->R.rdi);
 		break;
 	case SYS_READ: // 9
+		// check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 1);
 		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_WRITE: // 10
+		// check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 0);
 		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_SEEK: // 11
@@ -262,6 +266,8 @@ int filesize(int fd)
 /* NOTE: [2.4] read() 시스템 콜 구현 */
 int read(int fd, void *buffer, unsigned size)
 {
+
+
 	// check_address(buffer);
 	/*--------------------------*/
 	struct page *page = spt_find_page(&thread_current()->spt, buffer);
@@ -302,7 +308,7 @@ int read(int fd, void *buffer, unsigned size)
 
 /* NOTE: [2.4] write() 시스템 콜 구현 */
 int write(int fd, const void *buffer, unsigned size)
-{
+{	
 	check_address(buffer);
 
 	/* 파일에 동시 접근이 일어날 수 있으므로 Lock 사용 */
@@ -355,14 +361,16 @@ unsigned tell(int fd)
 
 /* NOTE: [2.4] close() 시스템 콜 구현 */
 void close(int fd)
-{
+{	
+	lock_acquire(&filesys_lock);
 	/* 해당 파일 디스크립터에 해당하는 파일을 닫음 */
 	process_close_file(fd);
+	lock_release(&filesys_lock);
 }
 
 /* ---------- UTIL ---------- */
 /* NOTE: [2.2] 추가 함수 - 주소 값이 유저 영역에서 사용하는 주소 값인지 확인하는 함수 */
-void check_address(void *addr)
+struct page *check_address(void *addr)
 {
 	if (addr == NULL || is_kernel_vaddr(addr))
 		exit(-1);
@@ -412,4 +420,15 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 
 void munmap (void *addr){
 	do_munmap(addr);
+}
+
+
+void check_valid_buffer(void *buffer, unsigned size, void *rsp, bool writable) {
+	for (size_t i = 0; i <size; i += 8){
+		struct page *page = check_address(buffer + i);
+
+		if (!page || (writable && !(page->writable))) {
+			exit(-1);
+		}
+	}
 }

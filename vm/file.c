@@ -2,6 +2,8 @@
 
 #include "vm/vm.h"
 #include "userprog/process.h"
+#include "userprog/syscall.h"
+#include "threads/vaddr.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -36,15 +38,29 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 }
 
 /* Swap in the page by read contents from the file. */
+//파일에서 페이지의 내용을 읽어서 메모리에 로드 
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
+
+	return lazy_load_segment(page, file_page);
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+	
+	// 페이지가 수정되었는지 확인 dirty bit 
+	if (pml4_is_dirty(thread_current()->pml4, page->va)) {
+		//페이지 내용이 수정되었다면 파일에 다시 씀
+		file_write_at(file_page->file, page->va, file_page->read_bytes, file_page->ofs);
+		pml4_set_dirty(thread_current()->pml4, page->va, 0); //dirty bit 0으로 페이지가 더 이상 수정되지 않았음을 표시
+	}
+	page->frame->page = NULL; 
+	page->frame = NULL;
+	pml4_clear_page(thread_current()->pml4, page->va);
+	return true;
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
@@ -67,6 +83,7 @@ void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 	
+	// lock_acquire(&filesys_lock);
 	/*file_reopen을 통해 동일한 파일에 대해 다른 주소를 가지는 파일 구조체 생성
 	 -> mmap하는 동안 외부에서 해당 파일을 close하는 불상사를 막기 위해서*/
 	struct file *f = file_reopen(file); 
@@ -120,7 +137,7 @@ do_mmap (void *addr, size_t length, int writable,
 		addr += PGSIZE;
 		offset += page_read_bytes;
 	}
-	
+	// lock_release(&filesys_lock);
 	return start_addr;
 }
 
@@ -151,6 +168,7 @@ do_munmap (void *addr) {
 	struct supplemental_page_table *spt = &thread_current()->spt;
 	struct page *p = spt_find_page(spt, addr);
 	int cnt = p->mapped_page_count;
+	// lock_acquire(&filesys_lock);
 
 	//매핑된 페이지의 수만큼 반복
 	for (int i = 0; i <cnt; i++){	
@@ -160,4 +178,5 @@ do_munmap (void *addr) {
 		addr += PGSIZE;
 		p = spt_find_page(spt, addr);
 	}
+	// lock_release(&filesys_lock);
 }

@@ -239,10 +239,10 @@ int process_exec(void *f_name) /* NOTE: 강의의 start_process() */
 	/* We first kill the current context */
 	process_cleanup();
 
-	lock_acquire(&filesys_lock);
+	// lock_acquire(&filesys_lock);
 	/* And then load the binary */
 	success = load(file_name, &_if);
-	lock_release(&filesys_lock);
+	// lock_release(&filesys_lock);
 
 	/* NOTE: [2.3] 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
 	// sema_up(&thread_current()->load_sema);
@@ -448,6 +448,7 @@ void process_close_file(int fd)
 	// lock_acquire(&filesys_lock);
 	file_close(file);
 	// lock_release(&filesys_lock);
+	
 	/* 파일 디스크립터 테이블 해당 엔트리 초기화*/
 	curr->fdt[fd] = NULL;
 }
@@ -534,11 +535,9 @@ load(const char *file_name, struct intr_frame *if_)
 		goto done;
 	process_activate(thread_current());
 
-	// lock_acquire(&filesys_lock);
 	/* Open executable file. */
+	lock_acquire(&filesys_lock);
 	file = filesys_open(file_name);
-	// lock_release(&filesys_lock);
-
 	if (file == NULL)
 	{
 		printf("load: %s: open failed\n", file_name);
@@ -626,6 +625,7 @@ load(const char *file_name, struct intr_frame *if_)
 done:
 	/* We arrive here whether the load is successful or not. */
 	// file_close(file);
+	lock_release(&filesys_lock);
 	return success;
 }
 
@@ -821,6 +821,7 @@ lazy_load_segment(struct page *page, void *aux)
 	size_t page_zero_bytes = lazy_load_arg->zero_bytes;
 	//size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
+	// lock_acquire(&filesys_lock);
 	//파일의 오프셋 설정 - 파일의 현재 위치 변경 
 	file_seek(file, offset);
 
@@ -828,12 +829,14 @@ lazy_load_segment(struct page *page, void *aux)
 	if (file_read(file, page->frame->kva, page_read_bytes) != (int)page_read_bytes) {
 		//읽기에 실패한 경우 할당된 페이지 해제 
 		palloc_free_page(page->frame->kva);
+		// lock_release(&filesys_lock);
 		// printf("file_read fail: read_byte %d\n", page_read_bytes);
 		return false;
 	}
 
 	//페이지의 kva 주소에서 read_bytes만큼 떨어진 위치부터 나머지 바이트(zero_bytes)만큼을 0으로 채운다.
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
+	// lock_release(&filesys_lock);
 
 	return true;
 }

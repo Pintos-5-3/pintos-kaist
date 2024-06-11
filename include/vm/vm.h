@@ -73,6 +73,13 @@ struct frame {
 	struct list_elem frame_elem;
 };
 
+/*--------------------------------------*/
+struct slot {
+	struct page *page;
+	uint32_t slot_no;
+	struct list_elem swap_elem;
+};
+
 /* The function table for page operations.
  * This is one way of implementing "interface" in C.
  * Put the table of "method" into the struct's member, and
@@ -127,6 +134,9 @@ void hash_page_destroy(struct hash_elem *e, void *aux);
 
 static struct list frame_table;
 static struct list_elem *ft_start;
+struct lock frame_table_lock;
 struct lock spt_lock;
+struct lock swap_table_lock;
+struct list swap_table;
 
 #endif  /* VM_VM_H */
