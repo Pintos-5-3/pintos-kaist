@@ -44,12 +44,18 @@ file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
 
 	return lazy_load_segment(page, file_page);
+	// struct file_page *file_page UNUSED = &page->file;
+
+	// int read = file_read_at(file_page->file, page->frame->kva, file_page->read_bytes, file_page->ofs);
+	// memset(page->frame->kva + read, 0, PGSIZE - read);
+	// return true;
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+
 	
 	// 페이지가 수정되었는지 확인 dirty bit 
 	if (pml4_is_dirty(thread_current()->pml4, page->va)) {
@@ -74,6 +80,14 @@ file_backed_destroy (struct page *page) {
 		file_write_at(file_page->file, page->va, file_page->read_bytes, file_page->ofs); //페이지의 데이터를 디스크 파일에 씀
 		pml4_set_dirty(thread_current()->pml4, page->va, 0); //dirty bit를 0으로 초기화하여 페이지가 더 이상 수정되지 않았음을 표시
 	}
+
+	 if (page->frame) {
+        list_remove(&page->frame->frame_elem);
+        page->frame->page = NULL;
+        page->frame = NULL;
+        free(page->frame);
+    }
+
 	pml4_clear_page(thread_current()->pml4, page->va); //페이지의 present bit 값을 0으로 만들어주는 함수 - 페이지가 더 이상 메모리에 존재하지 않음을 표시 
 }
 
@@ -83,7 +97,7 @@ void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 	
-	// lock_acquire(&filesys_lock);
+	lock_acquire(&filesys_lock);
 	/*file_reopen을 통해 동일한 파일에 대해 다른 주소를 가지는 파일 구조체 생성
 	 -> mmap하는 동안 외부에서 해당 파일을 close하는 불상사를 막기 위해서*/
 	struct file *f = file_reopen(file); 
@@ -137,7 +151,7 @@ do_mmap (void *addr, size_t length, int writable,
 		addr += PGSIZE;
 		offset += page_read_bytes;
 	}
-	// lock_release(&filesys_lock);
+	lock_release(&filesys_lock);
 	return start_addr;
 }
 
@@ -168,7 +182,7 @@ do_munmap (void *addr) {
 	struct supplemental_page_table *spt = &thread_current()->spt;
 	struct page *p = spt_find_page(spt, addr);
 	int cnt = p->mapped_page_count;
-	// lock_acquire(&filesys_lock);
+	lock_acquire(&filesys_lock);
 
 	//매핑된 페이지의 수만큼 반복
 	for (int i = 0; i <cnt; i++){	
@@ -178,5 +192,5 @@ do_munmap (void *addr) {
 		addr += PGSIZE;
 		p = spt_find_page(spt, addr);
 	}
-	// lock_release(&filesys_lock);
+	lock_release(&filesys_lock);
 }

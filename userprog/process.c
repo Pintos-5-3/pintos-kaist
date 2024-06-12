@@ -345,16 +345,26 @@ int process_wait(tid_t child_tid)
 
 /* Exit the process. This function is called by thread_exit (). */
 void process_exit(void)
-{
+{	
+	bool flag = false;
 	struct thread *curr = thread_current();
 
 	/* NOTE: [2.5] run_file 닫아주기 */
+	if (!lock_held_by_current_thread(&filesys_lock)){
+		lock_acquire(&filesys_lock);
+		flag = true;
+	}
 	file_close(curr->run_file);
 	curr->run_file = NULL;
 
 	/* NOTE: [2.4] 모든 열린 파일 닫기 */
 	for (int idx = 2; idx < FDT_MAX; idx++)
 		file_close(process_get_file(idx));
+	
+	if (flag) {
+		lock_release(&filesys_lock);
+	}
+
 	palloc_free_page(curr->fdt);
 	process_cleanup();
 
@@ -821,6 +831,11 @@ lazy_load_segment(struct page *page, void *aux)
 	size_t page_zero_bytes = lazy_load_arg->zero_bytes;
 	//size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
+	bool flag = false;
+	if (!lock_held_by_current_thread(&filesys_lock)){
+		lock_acquire(&filesys_lock);
+		flag = true;
+	}
 	// lock_acquire(&filesys_lock);
 	//파일의 오프셋 설정 - 파일의 현재 위치 변경 
 	file_seek(file, offset);
@@ -836,7 +851,9 @@ lazy_load_segment(struct page *page, void *aux)
 
 	//페이지의 kva 주소에서 read_bytes만큼 떨어진 위치부터 나머지 바이트(zero_bytes)만큼을 0으로 채운다.
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
-	// lock_release(&filesys_lock);
+	if (flag) {
+		lock_release(&filesys_lock);	
+	}
 
 	return true;
 }

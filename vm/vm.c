@@ -153,20 +153,33 @@ vm_get_victim (void) {
 	struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
 	struct thread *cur = thread_current();
-	struct list_elem *frame_e;
-	struct list_elem *e = ft_start;
+	
+	bool flag = false;
+	if (lock_held_by_current_thread(&frame_table_lock)) {
+		lock_acquire(&frame_table_lock);
+		flag = true;
+	}
 
-	for (frame_e = list_begin(&frame_table); frame_e != list_end(&frame_table); frame_e = list_next(frame_e)){
-		victim = list_entry(frame_e, struct frame, frame_elem);
+
+	for (ft_start = list_begin(&frame_table); ft_start != list_end(&frame_table); ft_start = list_next(ft_start)){
+		victim = list_entry(ft_start, struct frame, frame_elem);
 
 		//현재 쓰레드의 페이지 테이블에서 victim 페이지가 접근된 페이지인지 확인
 		if (pml4_is_accessed(cur->pml4, victim->page->va))
 			//만약 접근된 페이지라면 접근 플래그를 0으로 설정.
 			//다음번 탐색에서 victim으로 선택될 수 있도록 한다. 
 			pml4_set_accessed(cur->pml4, victim->page->va, 0);
-		else	
+		else
+		{	
+			if (flag) {
+				lock_release(&frame_table_lock);	
+			}
 			return victim;
+		}
 	} 
+	if (flag) {
+		lock_release(&frame_table_lock);	
+	}	
 	return victim;
 }
 
@@ -174,7 +187,7 @@ vm_get_victim (void) {
  * Return NULL on error.*/
 static struct frame *
 vm_evict_frame (void) {
-	struct frame *victim UNUSED = vm_get_victim ();
+	struct frame *victim = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
 	if (victim->page)
 		swap_out(victim->page);
@@ -205,10 +218,17 @@ vm_get_frame (void) {
 		return frame;
 	}
 
-	lock_acquire(&frame_table_lock);
+	bool flag = false;
+	if (lock_held_by_current_thread(&frame_table_lock)) {
+		lock_acquire(&frame_table_lock);
+		flag = true;
+	}
 	//할당받은 frame을 frame_table 리스트의 끝에 추가한다.
 	list_push_back(&frame_table, &frame->frame_elem);
-	lock_release(&frame_table_lock);
+	if (flag){
+		lock_release(&frame_table_lock);
+	}
+
 	
 	frame->page = NULL; //물리 프레임을 할당받고 아직 매핑된 가상 페이지는 없으니까 NULL로 초기 설정을 해준다. 
 	ASSERT(frame != NULL);
@@ -346,10 +366,16 @@ vm_claim_page (void *va UNUSED) {
 //성공적인 연산 -> return true, 아니면 return false
 static bool
 vm_do_claim_page (struct page *page) {
+	bool flag = false; 
 
 	//page가 유효하지 않거나, 이미 page->frame (물리 프레임이 할당되었을 경우)
 	if (!page || page->frame) {
 		return false;
+	}
+
+	if (!lock_held_by_current_thread(&spt_lock)){
+		flag = true;
+		lock_acquire(&spt_lock);
 	}
 
 	//사용 가능한 물리 frame 할당 받음
@@ -364,11 +390,19 @@ vm_do_claim_page (struct page *page) {
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	struct thread *cur = thread_current();
 	//현재 쓰레드의 pml4 페이지 테이블에 새로운 PTE 삽입
-	pml4_set_page(cur->pml4, page->va, frame->kva, page->writable);
- 
+	if (!pml4_set_page(cur->pml4, page->va, frame->kva, page->writable))
+		return false;
+	
 	//swap-in을 통해서 디스크의 스왑 영역에서 물리 메모리 프레임으로 load 
 	//-> 스왑 작업 성공 여부 boolean 리턴
-	return swap_in(page, frame->kva);
+	bool success  = swap_in(page, frame->kva);
+	
+	if (flag){
+		lock_release(&spt_lock);
+		flag = false;
+	}
+
+	return success;
 }
 
 /* Initialize new supplemental page table */
@@ -451,8 +485,16 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
-	
+	bool flag = false;
+	if (lock_held_by_current_thread(&spt_lock)){
+		lock_acquire(&spt_lock);
+		flag= true;
+	}
 	hash_clear(&spt->spt_hash, hash_page_destroy);
+	if (flag){
+		lock_release(&spt_lock);
+		flag = false;
+	}
 }
 
 /*-----------------------------------------------------------------------*/

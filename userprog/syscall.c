@@ -57,7 +57,7 @@ bool create(const char *file, unsigned initial_size);
 bool remove(const char *file);
 
 struct page *check_address(void *addr);
-void check_valid_buffer(void *buffer, unsigned size, void *rsp, bool writable) ;
+void check_valid_buffer(void *buffer, unsigned size, bool writable) ;
 
 void syscall_init(void)
 {
@@ -144,6 +144,8 @@ void syscall_handler(struct intr_frame *f)
 	case SYS_MUNMAP:
 		munmap(f->R.rdi);
 		break;
+	default:
+		exit(-1);
 	}
 }
 
@@ -309,7 +311,7 @@ int read(int fd, void *buffer, unsigned size)
 /* NOTE: [2.4] write() 시스템 콜 구현 */
 int write(int fd, const void *buffer, unsigned size)
 {	
-	check_address(buffer);
+    check_address(buffer);
 
 	/* 파일에 동시 접근이 일어날 수 있으므로 Lock 사용 */
 	lock_acquire(&filesys_lock);
@@ -423,7 +425,7 @@ void munmap (void *addr){
 }
 
 
-void check_valid_buffer(void *buffer, unsigned size, void *rsp, bool writable) {
+void check_valid_buffer(void *buffer, unsigned size, bool writable) {
 	for (size_t i = 0; i <size; i += 8){
 		struct page *page = check_address(buffer + i);
 
