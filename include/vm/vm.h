@@ -137,6 +137,6 @@ static struct list_elem *ft_start;
 struct lock frame_table_lock;
 struct lock spt_lock;
 struct lock swap_table_lock;
-struct list swap_table;
+// struct list swap_table;
 
 #endif  /* VM_VM_H */

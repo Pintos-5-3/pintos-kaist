@@ -155,7 +155,7 @@ vm_get_victim (void) {
 	struct thread *cur = thread_current();
 	
 	bool flag = false;
-	if (lock_held_by_current_thread(&frame_table_lock)) {
+	if (!lock_held_by_current_thread(&frame_table_lock)) {
 		lock_acquire(&frame_table_lock);
 		flag = true;
 	}
@@ -219,7 +219,7 @@ vm_get_frame (void) {
 	}
 
 	bool flag = false;
-	if (lock_held_by_current_thread(&frame_table_lock)) {
+	if (!lock_held_by_current_thread(&frame_table_lock)) {
 		lock_acquire(&frame_table_lock);
 		flag = true;
 	}
@@ -374,8 +374,8 @@ vm_do_claim_page (struct page *page) {
 	}
 
 	if (!lock_held_by_current_thread(&spt_lock)){
-		flag = true;
 		lock_acquire(&spt_lock);
+		flag = true;
 	}
 
 	//사용 가능한 물리 frame 할당 받음
@@ -399,7 +399,6 @@ vm_do_claim_page (struct page *page) {
 	
 	if (flag){
 		lock_release(&spt_lock);
-		flag = false;
 	}
 
 	return success;
@@ -415,8 +414,7 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 src에서 dst까지의 spt 복사 */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
-		struct supplemental_page_table *src UNUSED) {
-			
+	struct supplemental_page_table *src UNUSED) {
 	
 	//해쉬 테이블을 순회하기 위한 hash_iterator i
 	struct hash_iterator i;
@@ -474,7 +472,6 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct page *dst_page = spt_find_page(dst, upage);
 		memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
 	}
-
 	return true ;
 }
 

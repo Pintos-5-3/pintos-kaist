@@ -11,7 +11,7 @@ static bool anon_swap_out (struct page *page);
 static void anon_destroy (struct page *page);
 
 /*----------Swap In/out------------*/
-static struct bitmap *swap_bitmap;
+ struct bitmap *swap_table;
 const size_t SECTORS_PER_PAGE = PGSIZE / DISK_SECTOR_SIZE; /*한 페이지가 몇개의 섹터로 구성되는지*/
 
 
@@ -58,7 +58,7 @@ vm_anon_init (void) {
 	// }
 
 	swap_disk = disk_get(1,1);
-	swap_bitmap = bitmap_create(disk_size(swap_disk));
+	swap_table= bitmap_create(disk_size(swap_disk) / SECTORS_PER_PAGE);
 	lock_init(&swap_table_lock);
 }
 
@@ -121,24 +121,25 @@ anon_swap_in (struct page *page, void *kva) {
 
 	struct anon_page *anon_page = &page->anon;
 	lock_acquire(&swap_table_lock);
+
 	if (anon_page->slot_no == BITMAP_ERROR){
 		lock_release(&swap_table_lock);	
 		return false;
 	}
 
 
-	if (!bitmap_test(swap_bitmap, anon_page->slot_no)){
-		lock_release(&swap_table_lock);	
-		return false;
-	}
+	 if (!bitmap_test(swap_table, anon_page->slot_no)) {
+        lock_release(&swap_table_lock);
+        return false;
+    }
 
-	for (size_t i = 0; i < SECTORS_PER_PAGE; i++)
+	for (int i = 0; i < SECTORS_PER_PAGE; i++)
 		disk_read(swap_disk, (anon_page->slot_no * SECTORS_PER_PAGE) + i, kva + (i * DISK_SECTOR_SIZE));
 
-	bitmap_set(swap_bitmap, anon_page->slot_no, false);
+	bitmap_set(swap_table, anon_page->slot_no, false);
 
 	lock_release(&swap_table_lock);
-	anon_page->slot_no = BITMAP_ERROR;
+	// anon_page->slot_no = BITMAP_ERROR;
 
 	return true;
 }
@@ -184,7 +185,7 @@ anon_swap_out (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
 	
 	lock_acquire(&swap_table_lock);
-	size_t page_no = bitmap_scan_and_flip(swap_bitmap, 0, 1, false);
+	size_t page_no = bitmap_scan_and_flip(swap_table, 0, 1, false);
 
 	if (page_no == BITMAP_ERROR){
 		lock_release(&swap_table_lock);
@@ -221,8 +222,12 @@ anon_destroy (struct page *page) {
 	// lock_release(&swap_table_lock);
 	struct anon_page *anon_page = &page->anon;
 
-    if (anon_page->slot_no != BITMAP_ERROR)
-        bitmap_reset(swap_bitmap, anon_page->slot_no);
+	lock_acquire(&swap_table_lock);
+
+    if (anon_page->slot_no != BITMAP_ERROR){
+        bitmap_reset(swap_table, anon_page->slot_no);
+	}
+	lock_release(&swap_table_lock);
 
     if (page->frame) {
 		lock_acquire(&swap_table_lock);

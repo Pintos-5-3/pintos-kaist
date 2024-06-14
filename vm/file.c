@@ -35,6 +35,7 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	file_page->ofs = lazy_load_arg->ofs;
 	file_page->read_bytes = lazy_load_arg->read_bytes;
 	file_page->zero_bytes = lazy_load_arg->zero_bytes;
+	return true;
 }
 
 /* Swap in the page by read contents from the file. */
@@ -78,15 +79,15 @@ file_backed_destroy (struct page *page) {
 	//페이지가 dirty한 경우(수정되었다면) - 변경된 데이터를 디스크 파일에 다시 업데이트
 	if (pml4_is_dirty(thread_current()->pml4, page->va)){
 		file_write_at(file_page->file, page->va, file_page->read_bytes, file_page->ofs); //페이지의 데이터를 디스크 파일에 씀
-		pml4_set_dirty(thread_current()->pml4, page->va, 0); //dirty bit를 0으로 초기화하여 페이지가 더 이상 수정되지 않았음을 표시
+		// pml4_set_dirty(thread_current()->pml4, page->va, 0); //dirty bit를 0으로 초기화하여 페이지가 더 이상 수정되지 않았음을 표시
 	}
 
-	 if (page->frame) {
-        list_remove(&page->frame->frame_elem);
-        page->frame->page = NULL;
-        page->frame = NULL;
-        free(page->frame);
-    }
+	//  if (page->frame) {
+    //     list_remove(&page->frame->frame_elem);
+    //     page->frame->page = NULL;
+    //     page->frame = NULL;
+    //     free(page->frame);
+    // }
 
 	pml4_clear_page(thread_current()->pml4, page->va); //페이지의 present bit 값을 0으로 만들어주는 함수 - 페이지가 더 이상 메모리에 존재하지 않음을 표시 
 }
@@ -97,7 +98,7 @@ void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 	
-	lock_acquire(&filesys_lock);
+	// lock_acquire(&filesys_lock);
 	/*file_reopen을 통해 동일한 파일에 대해 다른 주소를 가지는 파일 구조체 생성
 	 -> mmap하는 동안 외부에서 해당 파일을 close하는 불상사를 막기 위해서*/
 	struct file *f = file_reopen(file); 
@@ -151,7 +152,7 @@ do_mmap (void *addr, size_t length, int writable,
 		addr += PGSIZE;
 		offset += page_read_bytes;
 	}
-	lock_release(&filesys_lock);
+	// lock_release(&filesys_lock);
 	return start_addr;
 }
 
@@ -182,15 +183,29 @@ do_munmap (void *addr) {
 	struct supplemental_page_table *spt = &thread_current()->spt;
 	struct page *p = spt_find_page(spt, addr);
 	int cnt = p->mapped_page_count;
-	lock_acquire(&filesys_lock);
+	struct file_page *file_page = &p->file;
+	
+	// lock_acquire(&filesys_lock);
+
+
+	struct lazy_load_arg *lazy_load_arg = (struct lazy_load_arg *)p->uninit.aux;
+	if (lazy_load_arg == NULL){
+		return NULL;
+	}
 
 	//매핑된 페이지의 수만큼 반복
 	for (int i = 0; i <cnt; i++){	
 		if (p) {
 			destroy(p);
 		}
+
+		pml4_clear_page(thread_current()->pml4, p->va);
+		if (p->frame){
+			palloc_free_page(p->frame->kva);
+		}
+		hash_delete(spt, &p->hash_elem);
 		addr += PGSIZE;
 		p = spt_find_page(spt, addr);
 	}
-	lock_release(&filesys_lock);
+	// lock_release(&filesys_lock);
 }

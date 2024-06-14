@@ -35,6 +35,7 @@ static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
 static void argument_stack(char **parse, int count, void **rsp);
+static void child_wait_caller (struct thread *cur);
 
 /* General process initializer for initd and other process. */
 static void process_init(void)
@@ -191,7 +192,7 @@ __do_fork(void *aux)
 		struct file *file = parent->fdt[i];
 		if (file == NULL)
 			continue;
-		if (file > 2)
+		if (file >= 2)
 			file = file_duplicate(file);
 		current->fdt[i] = file;
 	}
@@ -546,7 +547,11 @@ load(const char *file_name, struct intr_frame *if_)
 	process_activate(thread_current());
 
 	/* Open executable file. */
-	lock_acquire(&filesys_lock);
+
+	if (!lock_held_by_current_thread(&filesys_lock));{
+		lock_acquire(&filesys_lock);
+	}
+	
 	file = filesys_open(file_name);
 	if (file == NULL)
 	{
@@ -635,7 +640,9 @@ load(const char *file_name, struct intr_frame *if_)
 done:
 	/* We arrive here whether the load is successful or not. */
 	// file_close(file);
-	lock_release(&filesys_lock);
+	if (lock_held_by_current_thread(&filesys_lock));{
+		lock_release(&filesys_lock);
+	}
 	return success;
 }
 
@@ -682,6 +689,18 @@ validate_segment(const struct Phdr *phdr, struct file *file)
 
 	/* It's okay. */
 	return true;
+}
+
+
+static void child_wait_caller (struct thread *cur) {
+	struct list_elem *e; 
+
+	if (!list_empty(&cur->child_list)){
+		for (e = list_begin(&cur->child_list); e != list_end(&cur->child_list); e = list_next(e)){
+			struct thread *t = list_entry (e, struct thread, c_elem);
+			process_wait(t->tid);
+		}
+	}
 }
 
 #ifndef VM
@@ -866,7 +885,7 @@ lazy_load_segment(struct page *page, void *aux)
  * starting at offset OFS.
  *
  * - ZERO_BYTES bytes at UPAGE + READ_BYTES must be zeroed.
- *
+ 
  * The pages initialized by this function must be writable by the
  * user process if WRITABLE is true, read-only otherwise.
  *
